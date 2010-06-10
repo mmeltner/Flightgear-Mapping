@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainDlg</class>
+ <widget class="QDialog" name="MainDlg">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>588</width>
+    <height>389</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Voc-Trainer</string>
+  </property>
+  <layout class="QHBoxLayout" name="horizontalLayout_3">
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QPushButton" name="pBrecordTrack">
+       <property name="text">
+        <string>Record Track 1</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cBautocenter">
+       <property name="text">
+        <string>Autocenter</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cBtoorigin">
+       <property name="text">
+        <string>Point to Origin</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cBvor">
+       <property name="text">
+        <string>Display VOR</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cBndb">
+       <property name="text">
+        <string>Display NDB</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cBrw">
+       <property name="text">
+        <string>Display Rws</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="fRcurrentwp">
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Raised</enum>
+       </property>
+       <layout class="QGridLayout" name="gridLayout">
+        <property name="leftMargin">
+         <number>2</number>
+        </property>
+        <property name="topMargin">
+         <number>2</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>Current WP: </string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QLabel" name="lBcurrentwp">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>106</width>
+         <height>28</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QPushButton" name="pBminus">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>32</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pBplus">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>32</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>+</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Zoom:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lBzoom">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="Line" name="line_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pBexit">
+       <property name="text">
+        <string>Exit</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGraphicsView" name="gVmap">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>3</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOff</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOff</enum>
+     </property>
+     <property name="backgroundBrush">
+      <brush brushstyle="NoBrush">
+       <color alpha="0">
+        <red>0</red>
+        <green>0</green>
+        <blue>0</blue>
+       </color>
+      </brush>
+     </property>
+     <property name="foregroundBrush">
+      <brush brushstyle="NoBrush">
+       <color alpha="0">
+        <red>0</red>
+        <green>0</green>
+        <blue>0</blue>
+       </color>
+      </brush>
+     </property>
+     <property name="viewportUpdateMode">
+      <enum>QGraphicsView::FullViewportUpdate</enum>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>pBexit</sender>
+   <signal>clicked()</signal>
+   <receiver>MainDlg</receiver>
+   <slot>pBexit_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>78</x>
+     <y>366</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>76</x>
+     <y>336</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cBtoorigin</sender>
+   <signal>clicked()</signal>
+   <receiver>MainDlg</receiver>
+   <slot>cBpointorigin_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>67</x>
+     <y>85</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>2</x>
+     <y>116</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pBrecordTrack</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainDlg</receiver>
+   <slot>pBrecordTrack_toggled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>94</x>
+     <y>22</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>94</x>
+     <y>-3</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pBplus</sender>
+   <signal>clicked()</signal>
+   <receiver>MainDlg</receiver>
+   <slot>pBplus_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>121</x>
+     <y>307</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>111</x>
+     <y>14</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pBminus</sender>
+   <signal>clicked()</signal>
+   <receiver>MainDlg</receiver>
+   <slot>pBminus_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>40</x>
+     <y>307</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>36</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cBvor</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainDlg</receiver>
+   <slot>cBvor_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>111</x>
+     <y>112</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>166</x>
+     <y>7</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cBndb</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainDlg</receiver>
+   <slot>cBndb_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>90</x>
+     <y>140</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>137</x>
+     <y>152</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cBrw</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainDlg</receiver>
+   <slot>cBrw_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>74</x>
+     <y>158</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>8</x>
+     <y>191</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>pBexit_clicked()</slot>
+  <slot>pBplus_clicked()</slot>
+  <slot>pBminus_clicked()</slot>
+  <slot>pBloadtrack_clicked()</slot>
+  <slot>pBsavetrack_clicked()</slot>
+  <slot>cBpointorigin_clicked()</slot>
+  <slot>pBrecordTrack_toggled(bool)</slot>
+  <slot>cBvor_clicked()</slot>
+  <slot>cBndb_clicked()</slot>
+  <slot>cBrw_clicked()</slot>
+ </slots>
+</ui>

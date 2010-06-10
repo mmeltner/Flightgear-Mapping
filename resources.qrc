@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>vor.svg</file>
+    <file>flag-blue.png</file>
+    <file>rose.svg</file>
+    <file>wpttemp-red.png</file>
+  </qresource>
+</RCC>
