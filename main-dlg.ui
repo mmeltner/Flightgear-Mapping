@@ -328,7 +328,7 @@
   </connection>
   <connection>
    <sender>cBvor</sender>
-   <signal>toggled(bool)</signal>
+   <signal>clicked(bool)</signal>
    <receiver>MainDlg</receiver>
    <slot>cBvor_clicked()</slot>
    <hints>
@@ -344,7 +344,7 @@
   </connection>
   <connection>
    <sender>cBndb</sender>
-   <signal>toggled(bool)</signal>
+   <signal>clicked(bool)</signal>
    <receiver>MainDlg</receiver>
    <slot>cBndb_clicked()</slot>
    <hints>
@@ -360,7 +360,7 @@
   </connection>
   <connection>
    <sender>cBrw</sender>
-   <signal>toggled(bool)</signal>
+   <signal>clicked(bool)</signal>
    <receiver>MainDlg</receiver>
    <slot>cBrw_clicked()</slot>
    <hints>

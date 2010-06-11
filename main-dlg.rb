@@ -1,7 +1,7 @@
 =begin
 ** Form generated from reading ui file 'main-dlg.ui'
 **
-** Created: So. Jun 6 17:44:03 2010
+** Created: Fr. Jun 11 14:41:10 2010
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!
@@ -183,9 +183,9 @@ class Ui_MainDlg
     Qt::Object.connect(@pBrecordTrack, SIGNAL('toggled(bool)'), mainDlg, SLOT('pBrecordTrack_toggled(bool)'))
     Qt::Object.connect(@pBplus, SIGNAL('clicked()'), mainDlg, SLOT('pBplus_clicked()'))
     Qt::Object.connect(@pBminus, SIGNAL('clicked()'), mainDlg, SLOT('pBminus_clicked()'))
-    Qt::Object.connect(@cBvor, SIGNAL('toggled(bool)'), mainDlg, SLOT('cBvor_clicked()'))
-    Qt::Object.connect(@cBndb, SIGNAL('toggled(bool)'), mainDlg, SLOT('cBndb_clicked()'))
-    Qt::Object.connect(@cBrw, SIGNAL('toggled(bool)'), mainDlg, SLOT('cBrw_clicked()'))
+    Qt::Object.connect(@cBvor, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBvor_clicked()'))
+    Qt::Object.connect(@cBndb, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBndb_clicked()'))
+    Qt::Object.connect(@cBrw, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBrw_clicked()'))
 
     Qt::MetaObject.connectSlotsByName(mainDlg)
     end # setupUi

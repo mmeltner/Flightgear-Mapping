@@ -1,9 +1,24 @@
+##################################################
+# Flightgear Mapping
+#
+# Provide a real-time map of flight position in Flightgear. It is based on tiles from Openstreetmap, 
+# downloads them in the background, provides navigation aids and runways, allows setting of waypoints 
+# and tracks the flight.
+#
+# License
+# GPL V2
+#
+# Author Michael Meltner (mmeltner@gmail.com)
+##################################################
+
 require 'net/http'
 require "main-dlg"
 require "tile"
 require "resources"
 require 'socket'
-require "hud-impl"
+require "hud-impl"#
+# Author Michael Meltner (mmeltner@gmail.com)
+
 require "nodeinfo-impl"
 require 'navaid.rb'
 require "xml"
@@ -65,6 +80,7 @@ class MainDlg < Qt::Widget
 	attr_reader :node, :scene_tiles, :scene, :toffset_x, :offset_y, :menu, :waypoints, \
 		:flag, :zoom, :mytracks, :mytrack_current, :w
 	attr_writer :node, :scene_tiles, :offset_x, :offset_y, :waypoints, :mytrack_current, :w
+	attr_accessor :metricUnit
 	
 	slots "pBexit_clicked()", "pBdo_clicked()", "pBplus_clicked()", "pBminus_clicked()", \
 		"cBpointorigin_clicked()", "pBrecordTrack_toggled(bool)", "wakeupTimer()", "autosaveTimer()", \
@@ -75,7 +91,16 @@ class MainDlg < Qt::Widget
 		@w=Ui::MainDlg.new
 		@w.setupUi(self)
 		@parent=parent
-# 		last
+
+		@cfg=Qt::Settings.new("MMeltnerSoft", "fg_map")
+		@metricUnit = @cfg.value("metricUnit",Qt::Variant.new(true)).toBool
+		@zoom = @cfg.value("zoom",Qt::Variant.new(13)).toInt
+		@lat = @cfg.value("lat",Qt::Variant.new(LATSTARTUP)).toDouble
+		@lon = @cfg.value("lon",Qt::Variant.new(LONSTARTUP)).toDouble
+		@w.cBrw.setChecked(@cfg.value("rwChecked",Qt::Variant.new(false)).toBool)
+		@w.cBndb.setChecked(@cfg.value("nbdChecked",Qt::Variant.new(false)).toBool)
+		@w.cBvor.setChecked(@cfg.value("vorChecked",Qt::Variant.new(true)).toBool)
+
 		@flag=Qt::Pixmap.new(":/icons/flag-blue.png")
 		@pin=Qt::Pixmap.new(":/icons/wpttemp-red.png")
 		@linepen = Qt::Pen.new
@@ -94,9 +119,6 @@ class MainDlg < Qt::Widget
 		Qt::Object.connect( @autosaveTimer, SIGNAL('timeout()'), self, SLOT('autosaveTimer()') )
 		@autosaveTimer.start( AUTOSAVE_INTERVAL )
 
-		@zoom=13
-		@lat = LATSTARTUP
-		@lon = LONSTARTUP
 		@offset_x=@offset_y=0
 		@fs_ans=[]
 		@fs_queries=["/position/latitude-deg", "/position/longitude-deg", "/position/ground-elev-m", 
@@ -106,8 +128,7 @@ class MainDlg < Qt::Widget
 		@mytracks=[]
 		@mytrack_current=-1
 		@prev_track_node = nil
-		@posnode = Node.new(1, Time.now, LONSTARTUP, LATSTARTUP)
-#		@posnode = Node.new(1, Time.now, -121.8419298, 37.37171681)
+		@posnode = Node.new(1, Time.now, @lon, @lat)
 
 		@node = Node.new(1, Time.now, @lon, @lat, 0, @zoom)
 		@rot = 0
@@ -672,9 +693,12 @@ class MainDlg < Qt::Widget
 						@speed = get_data("/velocities/groundspeed-kt") * 1.852
 						@hud_widget.w.lBlat.setText("%2.3f°" % @posnode.lat)
 						@hud_widget.w.lBlon.setText("%2.3f°" % @posnode.lon)
-						@hud_widget.w.lBspeed.setText("%3.1f km/h" % (@speed))
+						@speed=5.0;@alt=1000
+						conversion = @metricUnit ? 1 : 0.54
+						@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  @metricUnit ? " km/h" : "kt")
 						@hud_widget.w.lBheading.setText("%3.1f°" % (@rot))
-						@hud_widget.w.lBalt.setText("%3.1fm" % @alt)
+						conversion = @metricUnit ? 1 : 3.281
+						@hud_widget.w.lBalt.setText("%3.1f" % (@alt*conversion) +  @metricUnit ? "m" : "ft")
 						mainnode_x=@node.toxtile
 						mainnode_y=@node.toytile
 						@rose.setPos((@posnode.toxtile - mainnode_x) * 256, (@posnode.toytile - mainnode_y) * 256)
@@ -768,7 +792,15 @@ class MainDlg < Qt::Widget
 	end
 	
 	def pBexit_clicked()
-		p @w.pBexit.text
+		puts "Syncing data and exiting."
+		@cfg.setValue("metricUnit", Qt::Variant.new(@metricUnit))
+		@cfg.setValue("zoom", Qt::Variant.new(@zoom))
+		@cfg.setValue("lat", Qt::Variant.new(@node.lat))
+		@cfg.setValue("lon", Qt::Variant.new(@node.lon))
+		@cfg.setValue("rwChecked", Qt::Variant.new(@w.cBrw.isChecked))
+		@cfg.setValue("nbdChecked", Qt::Variant.new(@w.cBndb.isChecked))
+		@cfg.setValue("vorChecked", Qt::Variant.new(@w.cBvor.isChecked))
+		@cfg.sync
 		@parent.close
 	end
 	
@@ -998,13 +1030,21 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 	
 	def contextMenuEvent(contextEvent)
 		dlg=contextEvent.widget.parent.parent
-		entries=["Set Waypoint", "Delete Waypoint", "Set Origin", "-", "Save Waypoints", "Save Track", "Load Waypoints", "Load Track"]
+		entries=["Set Waypoint", "Delete Waypoint", "Set Origin", "-", "Save Waypoints", "Save Track", "Load Waypoints",
+				"Load Track", ["Metric Units", dlg.metricUnit]]
 		menu=Qt::Menu.new
 		entries.each{|e|
-			if e=="-" then
-				menu.addSeparator
+			if e.kind_of? Array then
+				action = Qt::Action.new(e[0], nil)
+				action.setCheckable(true)
+				action.setChecked(e[1])
+				menu.addAction(action)
 			else
-				menu.addAction(e)
+				if e=="-" then
+					menu.addSeparator
+				else
+					menu.addAction(e)
+				end
 			end
 		}
 		sel=menu.exec(contextEvent.screenPos)
@@ -1058,7 +1098,10 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 				else
 					dlg.mytracks[dlg.mytrack_current]=savewp
 				end
-				
+
+			when entries[8][0]
+				dlg.metricUnit = !dlg.metricUnit
+								
 		end #case
 	end
 end
