@@ -16,9 +16,7 @@ require "main-dlg"
 require "tile"
 require "resources"
 require 'socket'
-require "hud-impl"#
-# Author Michael Meltner (mmeltner@gmail.com)
-
+require "hud-impl"
 require "nodeinfo-impl"
 require 'navaid.rb'
 require "xml"
@@ -183,7 +181,7 @@ class MainDlg < Qt::Widget
 		t=Qt::GraphicsTextItem.new(i.to_s, flag)
 		t.setPos(x + OFFSET_FLAG_COUNTER_X, y + OFFSET_FLAG_COUNTER_Y)
 		flag.setZValue(Z_VALUE_WAYPOINT)
-		tooltip=("Lon: %.3f°"%node.lon)+("\nLat: %.3f°"%node.lat)
+		tooltip=("Lon: %.3fï¿½"%node.lon)+("\nLat: %.3fï¿½"%node.lat)
 		if node.elevation>0 then
 			tooltip += ("\nElevation: %.1fm" % node.elevation)
 		end
@@ -691,12 +689,12 @@ class MainDlg < Qt::Widget
 						@rot = get_data("/orientation/heading-deg")
 						@alt = get_data("/position/ground-elev-m")
 						@speed = get_data("/velocities/groundspeed-kt") * 1.852
-						@hud_widget.w.lBlat.setText("%2.3f°" % @posnode.lat)
-						@hud_widget.w.lBlon.setText("%2.3f°" % @posnode.lon)
+						@hud_widget.w.lBlat.setText("%2.3fï¿½" % @posnode.lat)
+						@hud_widget.w.lBlon.setText("%2.3fï¿½" % @posnode.lon)
 						@speed=5.0;@alt=1000
 						conversion = @metricUnit ? 1 : 0.54
 						@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  @metricUnit ? " km/h" : "kt")
-						@hud_widget.w.lBheading.setText("%3.1f°" % (@rot))
+						@hud_widget.w.lBheading.setText("%3.1fï¿½" % (@rot))
 						conversion = @metricUnit ? 1 : 3.281
 						@hud_widget.w.lBalt.setText("%3.1f" % (@alt*conversion) +  @metricUnit ? "m" : "ft")
 						mainnode_x=@node.toxtile
@@ -981,8 +979,8 @@ class TrackGraphicsPathItem < Qt::GraphicsPathItem
 		
 		if !hit.nil? and !@parent.nil? then
 			n=@parent.nodes[hit]
-			@nodeinfo_widget.w.lBlon.text="%.3f°" % n.lon
-			@nodeinfo_widget.w.lBlat.text="%.3f°" % n.lat
+			@nodeinfo_widget.w.lBlon.text="%.3fï¿½" % n.lon
+			@nodeinfo_widget.w.lBlat.text="%.3fï¿½" % n.lat
 			@nodeinfo_widget.w.lBalt.text="%.1fm" % n.elevation
 			@nodeinfo_widget.w.lBspeed.text="%.1fkm/h" % n.speed
 			pos = mapToScene(hoverEvent.pos)
@@ -1068,7 +1066,9 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 				dlg.movemap(dlg.node, true)
 				
 			when entries[2]
-				dlg.node=Node.new(1, Time.now, lon, lat)
+				dlg.node = Node.new(1, Time.now, lon, lat)
+				dlg.offset_x = 0
+				dlg.offset_y = 0
 				dlg.movemap(dlg.node, true)
 				
 			when entries[4]

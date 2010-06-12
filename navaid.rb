@@ -9,8 +9,8 @@ rescue LoadError
 end
 
 
-#NAVAID_FILE = "/usr/share/games/FlightGear/Navaids/nav.dat.gz"
-NAVAID_FILE = "/home/chief/dev/nav.dat.gz"
+NAVAID_FILE = "/usr/share/games/FlightGear/Navaids/nav.dat.gz"
+#NAVAID_FILE = "/home/chief/dev/nav.dat.gz"
 
 class Navaid
 	Vor = Struct.new( :lat, :lon, :freq, :shortName, :longName, :type, :sceneItem )
