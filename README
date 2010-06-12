@@ -21,6 +21,8 @@ You basically have 3 options:
 
 2) (you already have ruby and rubygems installed)
 - type: sudo gem install fgmapping
+- make sure /var/lib/gems/1.8/bin is in your standard path ($PATH)
+- execute 'flightgear-mapping'
 
 3) (you don't have ruby installed, don't even know what this is)
 - download "fgmap_linux"
