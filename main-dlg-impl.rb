@@ -119,8 +119,9 @@ class MainDlg < Qt::Widget
 
 		@offset_x=@offset_y=0
 		@fs_ans=[]
-		@fs_queries=["/position/latitude-deg", "/position/longitude-deg", "/position/ground-elev-m", 
+		@fs_queries=["/position/latitude-deg", "/position/longitude-deg", "/position/altitude-ft", 
 			"/orientation/heading-deg", "/velocities/groundspeed-kt"]
+		@speed = 0
 
 		@waypoints=Way.new(nil,'user', Time.now, "Blue")
 		@mytracks=[]
@@ -181,7 +182,7 @@ class MainDlg < Qt::Widget
 		t=Qt::GraphicsTextItem.new(i.to_s, flag)
 		t.setPos(x + OFFSET_FLAG_COUNTER_X, y + OFFSET_FLAG_COUNTER_Y)
 		flag.setZValue(Z_VALUE_WAYPOINT)
-		tooltip=("Lon: %.3f�"%node.lon)+("\nLat: %.3f�"%node.lat)
+		tooltip=("Lon: %.3f°"%node.lon)+("\nLat: %.3f°"%node.lat)
 		if node.elevation>0 then
 			tooltip += ("\nElevation: %.1fm" % node.elevation)
 		end
@@ -687,16 +688,17 @@ class MainDlg < Qt::Widget
 						@posnode.lon = get_data("/position/longitude-deg")
 						@posnode.lat = get_data("/position/latitude-deg")
 						@rot = get_data("/orientation/heading-deg")
-						@alt = get_data("/position/ground-elev-m")
-						@speed = get_data("/velocities/groundspeed-kt") * 1.852
-						@hud_widget.w.lBlat.setText("%2.3f�" % @posnode.lat)
-						@hud_widget.w.lBlon.setText("%2.3f�" % @posnode.lon)
-						@speed=5.0;@alt=1000
+						@alt = get_data("/position/altitude-ft")
+						speed = get_data("/velocities/groundspeed-kt") * 1.852
+						# protect against bug in Flightsim, speed ofter zero if returned
+						@speed = speed if speed > 0
+						@hud_widget.w.lBlat.setText("%2.3f°" % @posnode.lat)
+						@hud_widget.w.lBlon.setText("%2.3f°" % @posnode.lon)
 						conversion = @metricUnit ? 1 : 0.54
-						@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  @metricUnit ? " km/h" : "kt")
-						@hud_widget.w.lBheading.setText("%3.1f�" % (@rot))
-						conversion = @metricUnit ? 1 : 3.281
-						@hud_widget.w.lBalt.setText("%3.1f" % (@alt*conversion) +  @metricUnit ? "m" : "ft")
+						@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  (@metricUnit ? " km/h" : "kt"))
+						@hud_widget.w.lBheading.setText("%3.1f°" % (@rot))
+						conversion = @metricUnit ? 3.281 : 1
+						@hud_widget.w.lBalt.setText("%3.1f" % (@alt/conversion) +  (@metricUnit ? "m" : "ft"))
 						mainnode_x=@node.toxtile
 						mainnode_y=@node.toytile
 						@rose.setPos((@posnode.toxtile - mainnode_x) * 256, (@posnode.toytile - mainnode_y) * 256)
