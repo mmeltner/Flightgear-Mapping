@@ -615,23 +615,27 @@ class MainDlg < Qt::Widget
 					@linepen.setColor(Qt::Color.new(track.color))
 					tck=nil
 					prev_node=false
-					track.nodes.each{|n|
-						if !prev_node then
-							tck=Qt::PainterPath.new(Qt::PointF.new((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256))
-						else
-							tck.lineTo((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256)
-						end
-						prev_node = true
-					}
-					track.path=TrackGraphicsPathItem.new(track)
-					track.path.setPath(tck)
-					track.path.setZValue(Z_VALUE_TRACK)
-					track.path.setPen(@linepen)
-					@scene.addItem(track.path)
+					if !track.nodes.empty? then
+						track.nodes.each{|n|
+							if !prev_node then
+								tck=Qt::PainterPath.new(Qt::PointF.new((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256))
+							else
+								tck.lineTo((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256)
+							end
+							prev_node = true
+						}
+						track.path=TrackGraphicsPathItem.new(track)
+						track.path.setPath(tck)
+						track.path.setZValue(Z_VALUE_TRACK)
+						track.path.setPen(@linepen)
+						@scene.addItem(track.path)
+					end
 				end
 			}
 			if @w.pBrecordTrack.isChecked then
-				@tckpath=@mytracks[@mytrack_current].path.path
+				if !@mytracks[@mytrack_current].path.nil?
+					@tckpath=@mytracks[@mytrack_current].path.path
+				end
 			end
 		end
 
@@ -730,10 +734,6 @@ class MainDlg < Qt::Widget
 							@offset_x = @posnode.toxtile - mainnode_x
 							@offset_y = @posnode.toytile - mainnode_y
 							movemap(@node)
-			#				@w.gVmap.centerOn(@offset_x*256,@offset_y*256)
-			#				if !@hud.nil? then
-			#					@hud.setPos(@w.gVmap.mapToScene(0,0))
-			#				end
 						end
 						if @mytrack_current >= 0 and @w.pBrecordTrack.isChecked then
 							if @mytracks[@mytrack_current].nil? then
@@ -774,6 +774,11 @@ class MainDlg < Qt::Widget
 		if state
 			@mytrack_current += 1
 			@w.pBrecordTrack.text = "Recording Track #{@mytrack_current + 1}"
+			if @mytracks[@mytrack_current].nil? then
+				@mytracks[@mytrack_current] = Way.new(1, 'user', Time.now, nextcolor)
+				@linepen.setColor(Qt::Color.new(@mytracks[@mytrack_current].color))
+				@prev_track_node = false
+			end
 		else
 			@w.pBrecordTrack.text = "Record Track #{@mytrack_current + 2}"
 		end
@@ -981,8 +986,8 @@ class TrackGraphicsPathItem < Qt::GraphicsPathItem
 		
 		if !hit.nil? and !@parent.nil? then
 			n=@parent.nodes[hit]
-			@nodeinfo_widget.w.lBlon.text="%.3f�" % n.lon
-			@nodeinfo_widget.w.lBlat.text="%.3f�" % n.lat
+			@nodeinfo_widget.w.lBlon.text="%.3f°" % n.lon
+			@nodeinfo_widget.w.lBlat.text="%.3f°" % n.lat
 			@nodeinfo_widget.w.lBalt.text="%.1fm" % n.elevation
 			@nodeinfo_widget.w.lBspeed.text="%.1fkm/h" % n.speed
 			pos = mapToScene(hoverEvent.pos)
