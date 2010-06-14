@@ -42,11 +42,11 @@ Z_VALUE_TILES = 0
 Z_VALUE_TRACK = 1
 Z_VALUE_TRACK_COLORED = 2
 Z_VALUE_WAYPOINT = 3
-Z_VALUE_ORIGIN = 4
-Z_VALUE_ROSE = 5
-Z_VALUE_POINTERTOORIGIN = 6
-Z_VALUE_POINTER = 7
-Z_VALUE_NAV = 8
+Z_VALUE_NAV = 4
+Z_VALUE_ORIGIN = 5
+Z_VALUE_ROSE = 6
+Z_VALUE_POINTERTOORIGIN = 7
+Z_VALUE_POINTER = 8
 Z_VALUE_HUD = 10
 SCALE_SVG = 0.3
 
@@ -495,15 +495,18 @@ class MainDlg < Qt::Widget
 		end
 
 		fn = node.getfilenames(@w.gVmap.size, @offset_x, @offset_y)
-		
+
 		fn.each{|f|
 			if !@scene_tiles.include?(f)
 				if FileTest.exist?(f+".png") then
 					addTileToScene(f, origin_x, origin_y)
 				elsif downloadTiles and (@timeNoInternet.nil? or (Time.now - @timeNoInternet) > 60) then
+#					Thread.abort_on_exception = true
 					@httpThreads << Thread.new {
 						@remainingTiles += 1
 						@httpMutex.synchronize {
+							h = Net::HTTP.new('tile.openstreetmap.org')
+							h.open_timeout = 10
 							@warningText = Qt::GraphicsSimpleTextItem.new("#{@remainingTiles} remaining tiles")
 							@warningText.setBrush(Qt::Brush.new(Qt::Color.new("red")))
 							@scene.addItem(@warningText)
@@ -511,29 +514,34 @@ class MainDlg < Qt::Widget
 							@warningText.setPos(@w.gVmap.mapToScene((@w.gVmap.size.width - @warningText.boundingRect.width)/2, 
 										@w.gVmap.size.height - fontInfo.pixelSize - 10))
 
-							h = Net::HTTP.new('tile.openstreetmap.org')
 							f =~ /\/\d+\/\d+\/\d+$/
 							f = $&
-							resp, data = h.get(f + ".png", nil)
-							if resp.kind_of?(Net::HTTPOK) then
-								maindir = Dir.pwd
-								Dir.chdir($MAPSHOME)
-								f.split("/")[0..-2].each do |dir|
-									if !dir.empty? then
-										begin
-											Dir.mkdir(dir) 
-										rescue Errno::EEXIST
-											# just swallow error
+							begin
+								resp, data = h.get(f + ".png", nil)
+								if resp.kind_of?(Net::HTTPOK) then
+									maindir = Dir.pwd
+									Dir.chdir($MAPSHOME)
+									f.split("/")[0..-2].each do |dir|
+										if !dir.empty? then
+											begin
+												Dir.mkdir(dir) 
+											rescue Errno::EEXIST
+												# just swallow error
+											end
+											Dir.chdir(dir)
 										end
-										Dir.chdir(dir)
 									end
+									Dir.chdir(maindir)
+									File.open($MAPSHOME + f + ".png", "w") do |file|
+										file.write(data)
+									end
+									addTileToScene($MAPSHOME + f, origin_x, origin_y)
+								else
+									puts "Could not download tile. Internet connection alive?"
+									@timeNoInternet=Time.now
 								end
-								Dir.chdir(maindir)
-								File.open($MAPSHOME + f + ".png", "w") do |file|
-									file.write(data)
-								end
-								addTileToScene($MAPSHOME + f, origin_x, origin_y)
-							else
+							# NoMethodError because of bug, see http://redmine.ruby-lang.org/issues/show/2708
+							rescue NoMethodError, Errno::ECONNREFUSED, SocketError, Timeout::Error
 								puts "Could not download tile. Internet connection alive?"
 								@timeNoInternet=Time.now
 							end
