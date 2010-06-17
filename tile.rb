@@ -149,7 +149,7 @@ class Way
 		end
 		@nodes=[]
 		@currentwp=nil
-		@distance_result=Hash.new(0)
+		@distance_result=Hash.new(nil)
 	end
 	
 	def <<(node)
@@ -215,8 +215,17 @@ class Way
 		return @timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 	end
 
+ 	def duration_str
+ 		if !@sec.nil? then
+ 			return @sec
+ 		end
+ 		sec = (nodes.last.timestamp - nodes.first.timestamp).to_i
+ 		min = sec / 60
+ 		@sec = "#{min/60}:" + ("%02d" % (min % 60)) + (":%02d" % (sec % 60))
+ 	end
+ 	
 	def distance(n)
-		if @distance_result.empty? then
+		if @distance_result[n].nil? then
 			distancenode=nil
 			total_distance=0.0
 			@nodes.each{|n|

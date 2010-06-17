@@ -212,6 +212,7 @@ class MainDlg < Qt::Widget
 				# just swallow error
 			end
 		
+			ap "generating xml-doc"
 			doc = XML::Document.new()
 			doc.root = XML::Node.new('gpx')
 			doc.root["xmlns"] = "http://www.topografix.com/GPX/1/1"
@@ -231,13 +232,14 @@ class MainDlg < Qt::Widget
 					trackpoint["lon"] = 	n.lon.to_s.gsub(",",".")
 					trackpoint << XML::Node.new("ele", n.elevation.to_s.gsub(",","."))
 					trackpoint << XML::Node.new("time", n.toGPStime)
-					trackpoint << XML::Node.new("time_us", n.timestamp.usec)
+					trackpoint << XML::Node.new("time_us", n.timestamp.usec.to_s)
 					segnode << trackpoint
 				}
 			}
 			File.open($MAPSHOME + "/tracks/" + items.first.nodes.first.toGPStime + ".gpx", "w+"){|f|
 				f.puts doc.inspect
 			}
+			ap "xml-file written"
 		end
 	end
 	
