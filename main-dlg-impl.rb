@@ -137,6 +137,7 @@ class MainDlg < Qt::Widget
 		@navs = Navaid.new(arg)
 		
 		@httpMutex = Mutex.new
+		@queryMutex = Mutex.new
 			
 		@scene=Qt::GraphicsScene.new()
 		@w.gVmap.setScene(@scene)
@@ -399,6 +400,7 @@ class MainDlg < Qt::Widget
 		@scene.addItem(vorGraphic)
 		vorNode = Node.new(0, nil, vor.lon.to_f, vor.lat.to_f)
 		vorGraphic.setPos((vorNode.toxtile - origin_x) * 256, (vorNode.toytile - origin_y) * 256)
+		vorGraphic.baseElement = vor
 		vor.sceneItem = vorGraphic
 		
 		# create text on Navaid
@@ -680,17 +682,21 @@ class MainDlg < Qt::Widget
 			end
 		else
 			begin
-				@fs_queries.each do |q|
-					@fs_socket.print("get " + q + "\r\n")
-					s=""
-					while select([@fs_socket], nil, nil, 0.1 ) do
-						s += @fs_socket.read(1)
+				@queryMutex.synchronize {
+					@fs_queries.each do |q|
+						@fs_socket.print("get " + q + "\r\n")
+						s=""
+						while select([@fs_socket], nil, nil, 0.3) do
+							s += @fs_socket.read(1)
+							# check for end of line characterized by this string: "\r\n/>"
+							break	if s[-4..-1] == "\r\n/>" and s.include?(q)
+						end
+						if s.include?(q) then
+							@fs_ans << s.split("\n")
+							@fs_ans.flatten!
+						end
 					end
-					if s.include?(q) then
-						@fs_ans << s.split("\n")
-						@fs_ans.flatten!
-					end
-				end
+				}
 			rescue
 				puts "Warning: Can not communicate with Flightsimulator. Is Telnet interface configured?"
 				@scene.removeItem(@rose)
@@ -698,7 +704,7 @@ class MainDlg < Qt::Widget
 				@fs_socket = nil
 				@hud = nil
 			else # rescue
-#				p @fs_ans
+				#ap @fs_ans
 				if @fs_ans.length>0 then # check if any answer has been received yet.
 					if !@hud.nil? then
 						@posnode.lon = get_data("/position/longitude-deg")
@@ -775,9 +781,22 @@ class MainDlg < Qt::Widget
 			end # rescue
 			@fs_ans=[]
 		end # socket nil
-#		p "wakeup out"
 	end
 	
+
+	def writeFlightsim(element)
+		@queryMutex.synchronize {
+			@fs_socket.print(element + "\r\n")
+			s = ""
+			while select([@fs_socket], nil, nil, 0.3) do
+				s += @fs_socket.read(1)
+				# check for end of line characterized by this string: "\r\n/>"
+				break	if s[-4..-1] == "\r\n/>"
+			end
+		}
+	end
+
+
 	def autosaveTimer()
 		savetrack(@mytracks, false)
 	end
@@ -1049,7 +1068,7 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 	
 	def contextMenuEvent(contextEvent)
 		dlg=contextEvent.widget.parent.parent
-		entries=["Set Waypoint", "Delete Waypoint", "Set Origin", "-", "Save Waypoints", "Save Track", "Load Waypoints",
+		entries=["Set Waypoint", "Delete Waypoint", "Waypoints to Route-Mgr", "Set Origin", "-", "Save Waypoints", "Save Track", "Load Waypoints",
 				"Load Track", ["Metric Units", dlg.metricUnit]]
 		menu=Qt::Menu.new
 		entries.each{|e|
@@ -1062,7 +1081,11 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 				if e=="-" then
 					menu.addSeparator
 				else
-					menu.addAction(e)
+					action = Qt::Action.new(e, nil)
+					if e =~ /(Delete Waypoint|Waypoints to)/ then
+						action.setEnabled(false) if dlg.waypoints.nodes.empty?
+					end
+					menu.addAction(action)
 				end
 			end
 		}
@@ -1087,18 +1110,26 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 				dlg.movemap(dlg.node, true)
 				
 			when entries[2]
+				Thread.new {
+					dlg.waypoints.nodes.each do |n|
+						dlg.writeFlightsim("set /autopilot/route-manager/input @INSERT-1:#{n.lon.to_s.gsub(",",".")},#{n.lat.to_s.gsub(",",".")}")
+					end
+				}
+		
+
+			when entries[3]
 				dlg.node = Node.new(1, Time.now, lon, lat)
 				dlg.offset_x = 0
 				dlg.offset_y = 0
 				dlg.movemap(dlg.node, true)
 				
-			when entries[4]
+			when entries[5]
 				dlg.saveWaypoints([dlg.waypoints])
 				
-			when entries[5]
+			when entries[6]
 				dlg.savetrack(dlg.mytracks)
 
-			when entries[6]
+			when entries[7]
 				savecurrent = dlg.waypoints.currentwp
 				if dlg.loadwaypoint("Load Waypoints") then
 					dlg.waypoints.currentwp = nil
@@ -1106,7 +1137,7 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 					dlg.waypoints.currentwp = savecurrent
 				end
 				
-			when entries[7]
+			when entries[8]
 				dlg.mytrack_current += (dlg.w.pBrecordTrack.isChecked ? 0 : 1)
 				savewp=dlg.mytracks[dlg.mytrack_current]
 				if dlg.mytracks[dlg.mytrack_current].nil? then
@@ -1120,7 +1151,7 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 					dlg.mytracks[dlg.mytrack_current]=savewp
 				end
 
-			when entries[8][0]
+			when entries[9][0]
 				dlg.metricUnit = !dlg.metricUnit
 								
 		end #case
@@ -1128,11 +1159,39 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 end
 
 
-class Qt::GraphicsScene
-	def mouseMoveEvent(mouseEvent)
-		super
-#			a=mouseEvent.scenePos()
-#			p a.x
+class Qt::GraphicsSvgItem
+	attr_accessor :baseElement
+
+	def contextMenuEvent(contextEvent)
+		dlg=contextEvent.widget.parent.parent
+		entries=["Add Waypoint as last", "Add Waypoint at"]
+		menu=Qt::Menu.new
+		entries.each{|e|
+			menu.addAction(e)
+		}
+		sel=menu.exec(contextEvent.screenPos)
+		sel=sel.text if !sel.nil?
+
+		ok = Qt::Boolean.new(true)
+
+		case sel
+			when entries[1]
+				# don't put this into a thread, it will create nasty core-dumps
+				resp = Qt::InputDialog.getInt(dlg, "Enter Waypoint Position.", "After which waypoint shall I insert this one?\nEnter 0 to insert at beginning.", 0, 0, 9999, 1, ok)
+		end #case
+		
+		if ok.value then
+			Thread.new {
+				case sel
+					when entries[0]
+						dlg.writeFlightsim("set /autopilot/route-manager/input @INSERT-1:#{baseElement.shortName}")
+
+					when entries[1]
+						dlg.writeFlightsim("set /autopilot/route-manager/input @INSERT+#{resp}:#{baseElement.shortName}")
+				end #case
+			}
+		end
 	end
+
 end
 
