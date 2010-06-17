@@ -12,7 +12,12 @@
 # Author Michael Meltner (mmeltner@gmail.com)
 ##################################################
 
-Dir.chdir(File.dirname(__FILE__))
+# check if we were launched via symlink, then resolve it
+myself = __FILE__
+if File.lstat(myself).symlink? then
+	myself = File.readlink(__FILE__)
+end
+Dir.chdir(File.dirname(myself))
 
 load "waypoint.rb"
 
