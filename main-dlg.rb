@@ -1,7 +1,7 @@
 =begin
 ** Form generated from reading ui file 'main-dlg.ui'
 **
-** Created: Fr. Jun 11 14:41:10 2010
+** Created: Do. Jun 17 17:42:25 2010
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!
@@ -35,7 +35,7 @@ class Ui_MainDlg
     if mainDlg.objectName.nil?
         mainDlg.objectName = "mainDlg"
     end
-    mainDlg.resize(588, 389)
+    mainDlg.resize(681, 473)
     @horizontalLayout_3 = Qt::HBoxLayout.new(mainDlg)
     @horizontalLayout_3.objectName = "horizontalLayout_3"
     @verticalLayout = Qt::VBoxLayout.new()

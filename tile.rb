@@ -214,8 +214,9 @@ class Way
 		#2009-06-18T20:32:16Z
 		return @timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 	end
- 
- 		if @distance_result.empty? then
+
+	def distance(n)
+		if @distance_result.empty? then
 			distancenode=nil
 			total_distance=0.0
 			@nodes.each{|n|
