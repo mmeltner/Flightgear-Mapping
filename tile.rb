@@ -17,8 +17,8 @@ class Node
 		@id = id
 		if time.kind_of? String then
 			#2009-06-18T20:32:16Z
-			time =~ /(\d*)-(\d*)-(\d*)T(\d*):(\d*):(\d*)Z/
-			@timestamp = Time.local($1,$2,$3,$4,$5,$6)
+			time =~ /(\d*)-(\d*)-(\d*)T(\d*):(\d*):(\d*)Z(\d*)/
+			@timestamp = Time.local($1,$2,$3,$4,$5,$6,$7)
 		else
 			@timestamp = time
 		end
@@ -122,7 +122,7 @@ class Node
 
 	def distanceto_str(lon, lat)
 		d = distanceto(lon, lat)
-		if d < 2.0 then
+		if d < 2000 then
 			return ("%.1f" % d) + "m"
 		else
 			return ("%.1f" % (d/1000.0)) + "km"
@@ -149,12 +149,14 @@ class Way
 		end
 		@nodes=[]
 		@currentwp=nil
+		@distance_result=Hash.new(0)
 	end
 	
 	def <<(node)
 		i=@nodes.index(nil)
 		if i.nil? then
 			@nodes << node
+			# fetch last 10 elements
 			check_nodes = @nodes[-10, 10]
 			if check_nodes.nil? then
 				check_nodes = @nodes
@@ -163,11 +165,11 @@ class Way
 				(node.timestamp - n.timestamp) <= SPEED_AVG_TIME_SEC
 			}
 			speeds=[]
-			t_diff = 0
+			t_diff = 0.0
 			avg_nodes.each_with_index{|n, i|
 				if i>0 then
 					t_diff = n.timestamp - avg_nodes[i-1].timestamp
-					if t_diff > 0 then
+					if t_diff > 0.0 then
 						speeds << n.distanceto(avg_nodes[i-1].lon, avg_nodes[i-1].lat) / t_diff
 					end
 				end
@@ -175,7 +177,7 @@ class Way
 			if speeds.length > 0 then
 				avg_speed = speeds.inject(0){ |result, element| result + element } / speeds.length * 3.6
 			else
-				avg_speed = 0
+				avg_speed = 0.0
 			end
 			node.speed = avg_speed
 			@nodes.length
@@ -211,6 +213,22 @@ class Way
 	def toGPStime()
 		#2009-06-18T20:32:16Z
 		return @timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+	end
+ 
+ 		if @distance_result.empty? then
+			distancenode=nil
+			total_distance=0.0
+			@nodes.each{|n|
+				if distancenode.nil? then distancenode = n; end
+				d = n.distanceto(distancenode.lon, distancenode.lat)
+				if  d >= 1.0 then # ignore if smaller than 1 meter
+					total_distance += d
+					distancenode = n
+				end
+				@distance_result[n] = total_distance
+			}
+  		end
+		return @distance_result[n]
 	end
 
 end

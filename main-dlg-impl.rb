@@ -230,6 +230,7 @@ class MainDlg < Qt::Widget
 					trackpoint["lon"] = 	n.lon.to_s.gsub(",",".")
 					trackpoint << XML::Node.new("ele", n.elevation.to_s.gsub(",","."))
 					trackpoint << XML::Node.new("time", n.toGPStime)
+					trackpoint << XML::Node.new("time_us", n.timestamp.usec)
 					segnode << trackpoint
 				}
 			}
@@ -257,10 +258,13 @@ class MainDlg < Qt::Widget
 					track=@mytracks[@mytrack_current]
 					track.nodes.clear
 					xpat_time = XML::XPath::Expression.new("ns:time")
+					xpat_time_us = XML::XPath::Expression.new("ns:time_us")
 					xpat_elevation = XML::XPath::Expression.new("ns:ele")
 					seg.find("ns:trkpt", "ns:http://www.topografix.com/GPX/1/1").each{|tpt|
-						track << Node.new(nil, tpt.find_first(xpat_time).content, tpt["lon"].to_f, \
-								tpt["lat"].to_f, tpt.find_first(xpat_elevation).content.to_f)
+						usec = tpt.find_first(xpat_time_us)
+						usec = (usec.nil? ? "0" : usec.content)
+						track << Node.new(nil, tpt.find_first(xpat_time).content + usec, \
+								tpt["lon"].to_f, tpt["lat"].to_f, tpt.find_first(xpat_elevation).content.to_f)
 						success = true
 					}
 				}
@@ -998,6 +1002,8 @@ class TrackGraphicsPathItem < Qt::GraphicsPathItem
 			@nodeinfo_widget.w.lBlat.text="%.3f°" % n.lat
 			@nodeinfo_widget.w.lBalt.text="%.1fm" % n.elevation
 			@nodeinfo_widget.w.lBspeed.text="%.1fkm/h" % n.speed
+			@nodeinfo_widget.w.lBdist.text="%.2fkm" % (@parent.distance(n) / 1000)
+			@nodeinfo_widget.w.lBtime.text=@parent.duration_str
 			pos = mapToScene(hoverEvent.pos)
 			if !@nodeinfo.isVisible or @nodeinfo_widget.hover_widget_pos.nil? or (!@nodeinfo_widget.hover_widget_pos.nil? \
 						and Qt::LineF.new(@nodeinfo_widget.hover_widget_pos, pos).length > 30) then
