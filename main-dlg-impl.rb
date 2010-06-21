@@ -55,6 +55,8 @@ COLOROFFSET_DEG = 240.0
 
 MINSPEED = 0.3 # minimum speed required for heading marker to appear, in m/s
 FS_READ_INTERVAL = 100 # enter GUI refresh loop every 100ms
+LOOPSLEEPINTERVAL = (0.95 * FS_READ_INTERVAL / 1000) # spend 95% of time sleeping to prevent
+																	  # threads from starving. Time is in seconds!
 TICKSTOSKIP = 20
 AUTOSAVE_INTERVAL = 10 * 60 * 1000 # autosave interval for tracks
 HOVER_TIMER = 2000 # time until HUD widget disappears
@@ -128,6 +130,7 @@ class MainDlg < Qt::Widget
 		@mytrack_current=-1
 		@prev_track_node = nil
 		@posnode = Node.new(1, Time.now, @lon, @lat)
+		@tempposnode = Node.new(1, Time.now, @lon, @lat)
 
 		@node = Node.new(1, Time.now, @lon, @lat, 0, @zoom)
 		@rot = 0
@@ -167,10 +170,13 @@ class MainDlg < Qt::Widget
 			end
 		end
 		puts "Map Directory located here: \"#{$MAPSHOME}\""
+		
+		readFlightgear()
 	end
 
 	def get_data(path)
-		r=@fs_ans.detect do |f|
+		# check from end to get most recent position
+		r=@fs_ans.reverse.detect do |f|
 			f.include?(path)
 		end
 		r =~ /-?\d+\.\d+/
@@ -661,6 +667,40 @@ class MainDlg < Qt::Widget
 		end
 	end
 
+	def readFlightgear
+		Thread.new do
+			while true
+				if @fs_socket.nil? then
+					sleep 1
+				else
+					begin
+						@queryMutex.synchronize {
+							@fs_queries.each do |q|
+								@fs_socket.print("get " + q + "\r\n")
+								s=""
+								while select([@fs_socket], nil, nil, 0.3) do
+									s += @fs_socket.read(1)
+									# check for end of line characterized by this string: "\r\n/>"
+									# break	if s[-4..-1] == "\r\n/>" and s.include?(q)
+								end
+								if s.include?(q) then
+									@fs_ans << s.split("\n")
+									@fs_ans.flatten!
+								end
+							end
+						}
+					rescue
+						puts "Warning: Can not communicate with Flightsimulator. Is Telnet interface configured?"
+						@scene.removeItem(@rose)
+						@scene.removeItem(@pointer)
+						@fs_socket = nil
+						@hud = nil
+					end
+				end
+			end #while
+		end # Thread
+	end
+
 	def wakeupTimer()
 #		p "wakeup in"
 		# have to do centering every time as QT will not scroll to scene coordinates which have no elements placed there yet
@@ -671,7 +711,13 @@ class MainDlg < Qt::Widget
 		end
 
 		@wakeupCounter += 1
-		return if @wakeupCounter <= TICKSTOSKIP
+		if @wakeupCounter <= TICKSTOSKIP then
+			# trick to prevent threads from getting just tiny slices of time to execute 
+			# inside the main event loop of QT
+			sleep LOOPSLEEPINTERVAL
+			return
+		end
+		
 		@wakeupCounter = 0
 
 		if @fs_socket.nil? then
@@ -683,104 +729,86 @@ class MainDlg < Qt::Widget
 				puts "Non-critical socket error: #{$!}"
 			end
 		else
-			begin
-				@queryMutex.synchronize {
-					@fs_queries.each do |q|
-						@fs_socket.print("get " + q + "\r\n")
-						s=""
-						while select([@fs_socket], nil, nil, 0.3) do
-							s += @fs_socket.read(1)
-							# check for end of line characterized by this string: "\r\n/>"
-							break	if s[-4..-1] == "\r\n/>" and s.include?(q)
-						end
-						if s.include?(q) then
-							@fs_ans << s.split("\n")
-							@fs_ans.flatten!
+			#ap @fs_ans
+			if @fs_ans.length>0 then # check if any answer has been received yet.
+				if !@hud.nil? then
+					@tempposnode.lon = get_data("/position/longitude-deg")
+					@tempposnode.lat = get_data("/position/latitude-deg")
+					@rot = get_data("/orientation/heading-deg")
+					@alt = get_data("/position/altitude-ft")
+					@speed = get_data("/velocities/groundspeed-kt")
+					# protect against invalid data
+					if !(@tempposnode.lon and @tempposnode.lat and @rot and @alt and @speed) then
+						@fs_ans=[]
+						return
+					end
+					@posnode = @tempposnode.dup
+					
+					@speed = @speed  * 1.852
+					@hud_widget.w.lBlat.setText("%2.3f°" % @posnode.lat)
+					@hud_widget.w.lBlon.setText("%2.3f°" % @posnode.lon)
+					conversion = @metricUnit ? 1 : 0.54
+					@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  (@metricUnit ? " km/h" : "kt"))
+					@hud_widget.w.lBheading.setText("%3.1f°" % (@rot))
+					conversion = @metricUnit ? 3.281 : 1
+					@hud_widget.w.lBalt.setText("%3.1f" % (@alt/conversion) +  (@metricUnit ? "m" : "ft"))
+					mainnode_x=@node.toxtile
+					mainnode_y=@node.toytile
+					@rose.setPos((@posnode.toxtile - mainnode_x) * 256, (@posnode.toytile - mainnode_y) * 256)
+					
+					@pointer.setTransform(Qt::Transform.new.scale(SCALE_SVG,SCALE_SVG).rotate(@rot+180.0) \
+							.translate(-@pointer_offsetx, -@pointer_offsetx))
+					@pointer.setPos((@posnode.toxtile - mainnode_x) * 256 ,(@posnode.toytile - mainnode_y) * 256)
+					
+					to_x = mainnode_x
+					to_y = mainnode_y
+					to_lon = @node.lon
+					to_lat = @node.lat
+					if !@w.cBtoorigin.isChecked and !@waypoints.currentwp.nil? then
+						if !@waypoints.nodes[@waypoints.currentwp-1].nil? then
+							to_x = @waypoints.nodes[@waypoints.currentwp-1].toxtile
+							to_y = @waypoints.nodes[@waypoints.currentwp-1].toytile
+							to_lon = @waypoints.nodes[@waypoints.currentwp-1].lon
+							to_lat = @waypoints.nodes[@waypoints.currentwp-1].lat
 						end
 					end
-				}
-			rescue
-				puts "Warning: Can not communicate with Flightsimulator. Is Telnet interface configured?"
-				@scene.removeItem(@rose)
-				@scene.removeItem(@pointer)
-				@fs_socket = nil
-				@hud = nil
-			else # rescue
-				#ap @fs_ans
-				if @fs_ans.length>0 then # check if any answer has been received yet.
-					if !@hud.nil? then
-						@posnode.lon = get_data("/position/longitude-deg")
-						@posnode.lat = get_data("/position/latitude-deg")
-						@rot = get_data("/orientation/heading-deg")
-						@alt = get_data("/position/altitude-ft")
-						speed = get_data("/velocities/groundspeed-kt") * 1.852
-						# protect against bug in Flightsim, speed ofter zero if returned
-						@speed = speed if speed > 0
-						@hud_widget.w.lBlat.setText("%2.3f°" % @posnode.lat)
-						@hud_widget.w.lBlon.setText("%2.3f°" % @posnode.lon)
-						conversion = @metricUnit ? 1 : 0.54
-						@hud_widget.w.lBspeed.setText("%3.1f" % (@speed*conversion) +  (@metricUnit ? " km/h" : "kt"))
-						@hud_widget.w.lBheading.setText("%3.1f°" % (@rot))
-						conversion = @metricUnit ? 3.281 : 1
-						@hud_widget.w.lBalt.setText("%3.1f" % (@alt/conversion) +  (@metricUnit ? "m" : "ft"))
-						mainnode_x=@node.toxtile
-						mainnode_y=@node.toytile
-						@rose.setPos((@posnode.toxtile - mainnode_x) * 256, (@posnode.toytile - mainnode_y) * 256)
-						
-						@pointer.setTransform(Qt::Transform.new.scale(SCALE_SVG,SCALE_SVG).rotate(@rot+180.0) \
-								.translate(-@pointer_offsetx, -@pointer_offsetx))
-						@pointer.setPos((@posnode.toxtile - mainnode_x) * 256 ,(@posnode.toytile - mainnode_y) * 256)
-						
-						to_x = mainnode_x
-						to_y = mainnode_y
-						to_lon = @node.lon
-						to_lat = @node.lat
-						if !@w.cBtoorigin.isChecked and !@waypoints.currentwp.nil? then
-							if !@waypoints.nodes[@waypoints.currentwp-1].nil? then
-								to_x = @waypoints.nodes[@waypoints.currentwp-1].toxtile
-								to_y = @waypoints.nodes[@waypoints.currentwp-1].toytile
-								to_lon = @waypoints.nodes[@waypoints.currentwp-1].lon
-								to_lat = @waypoints.nodes[@waypoints.currentwp-1].lat
-							end
+					@pointertoorigin.setTransform(Qt::Transform.new.scale(SCALE_SVG,SCALE_SVG).rotateRadians(Math::PI / 2 + \
+							Math.atan2((@posnode.toytile - to_y), (@posnode.toxtile - to_x))) \
+							.translate(-@pointertoorigin_offsetx, -@pointertoorigin_offsetx))
+					@pointertoorigin.setPos((@posnode.toxtile - mainnode_x) * 256 ,(@posnode.toytile - mainnode_y) * 256)
+					
+					@hud_widget.w.lBdistance.text = @posnode.distanceto_str(to_lon, to_lat)
+					
+					if @w.cBautocenter.isChecked then
+						@offset_x = @posnode.toxtile - mainnode_x
+						@offset_y = @posnode.toytile - mainnode_y
+						movemap(@node)
+					end
+					if @mytrack_current >= 0 and @w.pBrecordTrack.isChecked then
+						if @mytracks[@mytrack_current].nil? then
+							@mytracks[@mytrack_current] = Way.new(1, 'user', Time.now, nextcolor)
+							@linepen.setColor(Qt::Color.new(@mytracks[@mytrack_current].color))
+							@prev_track_node = false
 						end
-						@pointertoorigin.setTransform(Qt::Transform.new.scale(SCALE_SVG,SCALE_SVG).rotateRadians(Math::PI / 2 + \
-								Math.atan2((@posnode.toytile - to_y), (@posnode.toxtile - to_x))) \
-								.translate(-@pointertoorigin_offsetx, -@pointertoorigin_offsetx))
-						@pointertoorigin.setPos((@posnode.toxtile - mainnode_x) * 256 ,(@posnode.toytile - mainnode_y) * 256)
-						
-						@hud_widget.w.lBdistance.text = @posnode.distanceto_str(to_lon, to_lat)
-						
-						if @w.cBautocenter.isChecked then
-							@offset_x = @posnode.toxtile - mainnode_x
-							@offset_y = @posnode.toytile - mainnode_y
-							movemap(@node)
+						@mytracks[@mytrack_current] << Node.new(nil, Time.now, @posnode.lon, @posnode.lat, @alt / 3.281)
+						n = @mytracks[@mytrack_current].nodes.last
+						n.speed = @speed
+						if !@prev_track_node then
+							@tckpath = Qt::PainterPath.new(Qt::PointF.new((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256))
+							@mytracks[@mytrack_current].path=TrackGraphicsPathItem.new(@mytracks[@mytrack_current])
+							@mytracks[@mytrack_current].path.setPath(@tckpath)
+							@mytracks[@mytrack_current].path.setZValue(Z_VALUE_TRACK)
+							@mytracks[@mytrack_current].path.setPen(@linepen)
+							@scene.addItem(@mytracks[@mytrack_current].path)
+							@prev_track_node = true
+						else
+							@tckpath.lineTo((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256)
+							@mytracks[@mytrack_current].path.setPath(@tckpath)
 						end
-						if @mytrack_current >= 0 and @w.pBrecordTrack.isChecked then
-							if @mytracks[@mytrack_current].nil? then
-								@mytracks[@mytrack_current] = Way.new(1, 'user', Time.now, nextcolor)
-								@linepen.setColor(Qt::Color.new(@mytracks[@mytrack_current].color))
-								@prev_track_node = false
-							end
-							@mytracks[@mytrack_current] << Node.new(nil, Time.now, @posnode.lon, @posnode.lat, @alt)
-							n = @mytracks[@mytrack_current].nodes.last
-							n.speed = @speed
-							if !@prev_track_node then
-								@tckpath = Qt::PainterPath.new(Qt::PointF.new((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256))
-								@mytracks[@mytrack_current].path=TrackGraphicsPathItem.new(@mytracks[@mytrack_current])
-								@mytracks[@mytrack_current].path.setPath(@tckpath)
-								@mytracks[@mytrack_current].path.setZValue(Z_VALUE_TRACK)
-								@mytracks[@mytrack_current].path.setPen(@linepen)
-								@scene.addItem(@mytracks[@mytrack_current].path)
-								@prev_track_node = true
-							else
-								@tckpath.lineTo((n.toxtile - mainnode_x) * 256, (n.toytile - mainnode_y) * 256)
-								@mytracks[@mytrack_current].path.setPath(@tckpath)
-							end
-						end
-						
-					end # if !@hud.nil?
-				end # if @fs_ans.length>0
-			end # rescue
+					end
+					
+				end # if !@hud.nil?
+			end # if @fs_ans.length>0
 			@fs_ans=[]
 		end # socket nil
 	end
