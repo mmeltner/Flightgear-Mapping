@@ -24,6 +24,7 @@ require "Qt4"
 require "main-dlg-impl.rb"
 
 a = Qt::Application.new(ARGV)
+a.setWindowIcon(Qt::Icon.new(":/icons/vor.png"))
 u = Qt::MainWindow.new
 
 w = MainDlg.new(u, ARGV[0])

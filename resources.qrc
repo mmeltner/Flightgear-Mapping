@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="icons">
+    <file>vor.png</file>
     <file>vor.svg</file>
     <file>flag-blue.png</file>
     <file>rose.svg</file>
