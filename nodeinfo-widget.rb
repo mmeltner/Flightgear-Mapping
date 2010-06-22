@@ -1,7 +1,7 @@
 =begin
 ** Form generated from reading ui file 'nodeinfo-widget.ui'
 **
-** Created: Mo. Jun 21 22:46:54 2010
+** Created: Di. Jun 22 12:47:06 2010
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!

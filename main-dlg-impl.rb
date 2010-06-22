@@ -39,15 +39,17 @@ ILSCONEANGLE = 10 # in degree
 ILSTEXTOFFSET = 10 # in pixel
 
 Z_VALUE_TILES = 0
-Z_VALUE_TRACK = 1
-Z_VALUE_TRACK_COLORED = 2
-Z_VALUE_WAYPOINT = 3
-Z_VALUE_NAV = 4
-Z_VALUE_ORIGIN = 5
-Z_VALUE_ROSE = 6
-Z_VALUE_POINTERTOORIGIN = 7
-Z_VALUE_POINTER = 8
+Z_VALUE_TILES_ELEVATION = 1
+Z_VALUE_TRACK = 2
+Z_VALUE_TRACK_COLORED = 3
+Z_VALUE_WAYPOINT = 4
+Z_VALUE_NAV = 5
+Z_VALUE_ORIGIN = 6
+Z_VALUE_ROSE = 7
+Z_VALUE_POINTERTOORIGIN = 8
+Z_VALUE_POINTER = 9
 Z_VALUE_HUD = 10
+Z_VALUE_WARNING = 20
 SCALE_SVG = 0.3
 
 COLORRANGE_DEG = 120.0
@@ -58,6 +60,7 @@ FS_READ_INTERVAL = 100 # enter GUI refresh loop every 100ms
 LOOPSLEEPINTERVAL = (0.95 * FS_READ_INTERVAL / 1000) # spend 95% of time sleeping to prevent
 																	  # threads from starving. Time is in seconds!
 TICKSTOSKIP = 20
+
 AUTOSAVE_INTERVAL = 10 * 60 * 1000 # autosave interval for tracks
 HOVER_TIMER = 2000 # time until HUD widget disappears
 MAXVORSTODISPLAY = 500 # maximum number of nav-aids to display on map
@@ -65,16 +68,14 @@ MAXILSTODISPLAY = 200
 
 FS_PORT = 2948
 
-
-#LATSTARTUP = 49.462126667
-#LONSTARTUP = 11.121691667
 LATSTARTUP = 50.0368400387281
 LONSTARTUP = 8.55965957641601
 
 MAPSDIR = ENV['HOME'] + "/.OpenstreetmapTiles"
 
-#GC.disable
-
+Thread.abort_on_exception = true
+GC.disable
+ap "gcdisabl"
 # Class MainDlg ############################################
 class MainDlg < Qt::Widget
 	attr_reader :node, :scene_tiles, :scene, :toffset_x, :offset_y, :menu, :waypoints, \
@@ -84,8 +85,8 @@ class MainDlg < Qt::Widget
 	
 	slots "pBexit_clicked()", "pBdo_clicked()", "pBplus_clicked()", "pBminus_clicked()", \
 		"cBpointorigin_clicked()", "pBrecordTrack_toggled(bool)", "wakeupTimer()", "autosaveTimer()", \
-		'cBvor_clicked()', 'cBndb_clicked()', 'cBrw_clicked()'
-
+		'cBvor_clicked()', 'cBndb_clicked()', 'cBrw_clicked()', 'cBshadows_clicked()'
+@@pixmap=Array.new
 	def initialize(parent, arg)
 		super(parent)
 		@w=Ui::MainDlg.new
@@ -136,11 +137,16 @@ class MainDlg < Qt::Widget
 		@rot = 0
 		@remainingTiles = 0
 		@httpThreads = Array.new
+		@currentlyDownloading = Array.new
+		@currentlyDownloadingElevation = Array.new
+		@tilesToAdd = Array.new
 		
 		@navs = Navaid.new(arg)
 		
 		@httpMutex = Mutex.new
+		@httpElevationMutex = Mutex.new
 		@queryMutex = Mutex.new
+		@tilesToAddMutex = Mutex.new
 			
 		@scene=Qt::GraphicsScene.new()
 		@w.gVmap.setScene(@scene)
@@ -357,6 +363,8 @@ class MainDlg < Qt::Widget
 			th.kill
 		end
 		@httpThreads = Array.new
+		@currentlyDownloading = Array.new
+		@currentlyDownloadingElevation = Array.new
 		@remainingTiles = 0
 		@scene.removeItem(@warningText)
 
@@ -376,6 +384,8 @@ class MainDlg < Qt::Widget
 		end
 		@remainingTiles = 0
 		@httpThreads = Array.new
+		@currentlyDownloading = Array.new
+		@currentlyDownloadingElevation = Array.new
 		@scene.removeItem(@warningText)
 
 		@zoom -= 1
@@ -388,16 +398,74 @@ class MainDlg < Qt::Widget
 		movemap(@node, true)
 	end
 
-	def addTileToScene(f, origin_x, origin_y)
-		pmi=TileGraphicsPixmapItem.new(Qt::Pixmap.new(f))
+	def addTileToScene(f, origin_x, origin_y, thread=false)
 		@scene_tiles << f
 		f =~ /\/(\d*)\/(\d*)\/(\d*)/
 		x = $2.to_i
 		y = $3.to_i
-#		p x - origin_x,y - origin_y
-		pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
-		pmi.setZValue(Z_VALUE_TILES)
-		@scene.addItem(pmi)
+
+		if thread then
+			# we can not add the tiles to the scene within this thread directly. It crosses thread
+			# bounderies which crashes QT badly
+			@tilesToAddMutex.synchronize {
+				@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES]
+			}
+		else # add immediately, we are not in a different thread
+			pmi=TileGraphicsPixmapItem.new(Qt::Pixmap.new(f))
+			pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
+			pmi.setZValue(Z_VALUE_TILES)
+			@scene.addItem(pmi)
+		end
+
+		if @w.cBshadows.isChecked then
+			if FileTest.exist?(f + "-elevation.png") then
+				if thread then
+					# we can not add the tiles to the scene within this thread directly. It crosses thread
+					# bounderies which crashes QT badly
+					@tilesToAddMutex.synchronize {
+						@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES_ELEVATION]
+					}
+				else
+					pmi = Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f + "-elevation.png"))
+					pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
+					pmi.setZValue(Z_VALUE_TILES_ELEVATION)
+					@scene.addItem(pmi)
+				end
+			else
+				@httpThreads << Thread.new(f) {|filename|
+					if !@currentlyDownloadingElevation.include?(filename) then
+						@currentlyDownloadingElevation << filename
+						# try to download elevation profile
+						@httpElevationMutex.synchronize {
+							h = Net::HTTP.new('toolserver.org')
+							h.open_timeout = 10
+							filename =~ /\/\d+\/\d+\/\d+$/
+							fn = $&
+							begin
+								resp, data = h.get("/~cmarqu/hill" + fn + ".png", nil)
+								if resp.kind_of?(Net::HTTPOK) then
+									# check here again as in the meantime another thread might already have added the tile
+									if !FileTest.exist?($MAPSHOME + fn + "-elevation.png") then
+										File.open($MAPSHOME + fn + "-elevation.png", "w") do |file|
+											file.write(data)
+										end
+										@tilesToAddMutex.synchronize {
+											@tilesToAdd << [$MAPSHOME + fn + "-elevation.png", (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES_ELEVATION]
+										}
+									end
+								else
+									puts "No elevation profile found for this tile."
+								end
+							# NoMethodError because of bug, see http://redmine.ruby-lang.org/issues/show/2708
+							rescue NoMethodError, Errno::ECONNREFUSED, SocketError, Timeout::Error
+								puts "No connection to elevation profile server."
+							end
+						} # sync
+						@currentlyDownloadingElevation.delete(filename)
+					end # if downloading
+				} # Thread
+			end
+		end
 	end
 
 	def addNavToScene(vor, origin_x, origin_y)
@@ -464,7 +532,7 @@ class MainDlg < Qt::Widget
 			@scene_navs = []
 			@scene_rws = []
 			@scene.clear
-			# 8 : 256 = 2**8
+			# 8 => 256 = 2**8
 			size = 2**(@zoom + 8)
 			sceneRect = Qt::RectF.new(0,0,size,size)
 			sceneRect.moveCenter(Qt::PointF.new(@node.xtile, @node.ytile))
@@ -511,57 +579,54 @@ class MainDlg < Qt::Widget
 		fn = node.getfilenames(@w.gVmap.size, @offset_x, @offset_y)
 
 		fn.each{|f|
-			if !@scene_tiles.include?(f)
+			if !@scene_tiles.include?(f) then
 				if FileTest.exist?(f+".png") then
 					addTileToScene(f, origin_x, origin_y)
 				elsif downloadTiles and (@timeNoInternet.nil? or (Time.now - @timeNoInternet) > 60) then
-#					Thread.abort_on_exception = true
-					@httpThreads << Thread.new {
-						@remainingTiles += 1
-						@httpMutex.synchronize {
-							h = Net::HTTP.new('tile.openstreetmap.org')
-							h.open_timeout = 10
-							@warningText = Qt::GraphicsSimpleTextItem.new("#{@remainingTiles} remaining tiles")
-							@warningText.setBrush(Qt::Brush.new(Qt::Color.new("red")))
-							@scene.addItem(@warningText)
-							fontInfo = Qt::FontInfo.new(@warningText.font)
-							@warningText.setPos(@w.gVmap.mapToScene((@w.gVmap.size.width - @warningText.boundingRect.width)/2, 
-										@w.gVmap.size.height - fontInfo.pixelSize - 10))
-
-							f =~ /\/\d+\/\d+\/\d+$/
-							f = $&
-							begin
-								resp, data = h.get(f + ".png", nil)
-								if resp.kind_of?(Net::HTTPOK) then
-									maindir = Dir.pwd
-									Dir.chdir($MAPSHOME)
-									f.split("/")[0..-2].each do |dir|
-										if !dir.empty? then
-											begin
-												Dir.mkdir(dir) 
-											rescue Errno::EEXIST
-												# just swallow error
+					@httpThreads << Thread.new(f) {|filename|
+						# check if we already download this tile
+						if !@currentlyDownloading.include?(filename) then
+							@currentlyDownloading << filename
+							@remainingTiles += 1
+							@httpMutex.synchronize {
+								h = Net::HTTP.new('tile.openstreetmap.org')
+								h.open_timeout = 10
+								filename =~ /\/\d+\/\d+\/\d+$/
+								fn = $&
+								begin
+									resp, data = h.get(fn + ".png", nil)
+									if resp.kind_of?(Net::HTTPOK) then
+										maindir = Dir.pwd
+										Dir.chdir($MAPSHOME)
+										fn.split("/")[0..-2].each do |dir|
+											if !dir.empty? then
+												begin
+													Dir.mkdir(dir) 
+												rescue Errno::EEXIST
+													# just swallow error
+												end
+												Dir.chdir(dir)
 											end
-											Dir.chdir(dir)
 										end
+										Dir.chdir(maindir)
+										File.open($MAPSHOME + fn + ".png", "w") do |file|
+											file.write(data)
+										end
+										# we call from within a thread, signal this to the subroutine
+										addTileToScene($MAPSHOME + fn, origin_x, origin_y, true)
+									else
+										puts "Could not download tile. Internet connection alive?"
+										@timeNoInternet=Time.now
 									end
-									Dir.chdir(maindir)
-									File.open($MAPSHOME + f + ".png", "w") do |file|
-										file.write(data)
-									end
-									addTileToScene($MAPSHOME + f, origin_x, origin_y)
-								else
+								# NoMethodError because of bug, see http://redmine.ruby-lang.org/issues/show/2708
+								rescue NoMethodError, Errno::ECONNREFUSED, SocketError, Timeout::Error
 									puts "Could not download tile. Internet connection alive?"
 									@timeNoInternet=Time.now
 								end
-							# NoMethodError because of bug, see http://redmine.ruby-lang.org/issues/show/2708
-							rescue NoMethodError, Errno::ECONNREFUSED, SocketError, Timeout::Error
-								puts "Could not download tile. Internet connection alive?"
-								@timeNoInternet=Time.now
-							end
-							@scene.removeItem(@warningText)
-						}
-						@remainingTiles -= 1
+							}
+							@remainingTiles -= 1
+							@currentlyDownloading.delete(filename)
+						end # if
 					}
 				else
 					puts "Internet timeout still running"
@@ -717,8 +782,34 @@ class MainDlg < Qt::Widget
 			sleep LOOPSLEEPINTERVAL
 			return
 		end
-		
 		@wakeupCounter = 0
+
+		# add tiles which are awaiting addition				
+		@tilesToAddMutex.synchronize {
+			@tilesToAdd.each do |tile|
+				pmi = TileGraphicsPixmapItem.new(Qt::Pixmap.new(tile[0]))
+				pmi.setOffset(tile[1], tile[2])
+				pmi.setZValue(tile[3])
+				@scene.addItem(pmi)
+			end
+			@tilesToAdd.clear
+		}
+
+		if @remainingTiles > 0 then
+			if @warningText.nil? then
+				@warningText = Qt::GraphicsSimpleTextItem.new()
+				@warningText.setBrush(Qt::Brush.new(Qt::Color.new("red")))
+				@warningText.setZValue(Z_VALUE_WARNING)
+				@scene.addItem(@warningText)
+			end
+			fontInfo = Qt::FontInfo.new(@warningText.font)
+			@warningText.setText("#{@remainingTiles} remaining tiles")
+			@warningText.setPos(@w.gVmap.mapToScene((@w.gVmap.size.width - @warningText.boundingRect.width)/2, 
+						@w.gVmap.size.height - fontInfo.pixelSize - 10))
+		elsif !@warningText.nil? then
+			@scene.removeItem(@warningText)
+			@warningText = nil
+		end
 
 		if @fs_socket.nil? then
 			begin
@@ -811,6 +902,7 @@ class MainDlg < Qt::Widget
 			end # if @fs_ans.length>0
 			@fs_ans=[]
 		end # socket nil
+#		p "wakeupTimer out"
 	end
 	
 
@@ -881,7 +973,11 @@ class MainDlg < Qt::Widget
 	def cBrw_clicked()
 		movemap(@node, true)
 	end
-
+	
+	def cBshadows_clicked()
+		movemap(@node, true)
+	end
+	
 	def resize(*k)
 		super
 		@hud.setPos(@w.gVmap.mapToScene(0,0)) if !@hud.nil?
@@ -944,8 +1040,8 @@ class TrackGraphicsPathItem < Qt::GraphicsPathItem
 		setAcceptHoverEvents(true)
 		setHandlesChildEvents(true)
 
-		# store these elements in permanent arry
-		# otherwise GC will remove them and then causes core-dump in QT
+		# store these elements in permanent array
+		# otherwise GC will remove them and then causes core-dumps in QT
 		@@nodeinfo_array << [@nodeinfow, @nodeinfo_widget]
 	end
 	
@@ -1091,7 +1187,7 @@ class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
 				dlg.offset_x = pos.x / 256.0
 				dlg.offset_y = pos.y / 256.0
 				dlg.movemap(dlg.node)
-			when Qt::RightButton
+#			when Qt::RightButton
 			
 		end # case
 	end
@@ -1225,3 +1321,12 @@ class Qt::GraphicsSvgItem
 
 end
 
+
+#class Qt::GraphicsScene
+#	def addItem(*k)
+#	#	ap "additem"
+#		ap k[0]
+#	#	ap items.length
+#		super
+#	end
+#end

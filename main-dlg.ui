@@ -41,6 +41,23 @@
       </widget>
      </item>
      <item>
+      <widget class="QCheckBox" name="cBshadows">
+       <property name="text">
+        <string>Hill Shadows</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="Line" name="line_3">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QCheckBox" name="cBvor">
        <property name="text">
         <string>Display VOR</string>
@@ -301,8 +318,8 @@
    <slot>pBplus_clicked()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>121</x>
-     <y>307</y>
+     <x>116</x>
+     <y>300</y>
     </hint>
     <hint type="destinationlabel">
      <x>111</x>
@@ -317,8 +334,8 @@
    <slot>pBminus_clicked()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>40</x>
-     <y>307</y>
+     <x>42</x>
+     <y>300</y>
     </hint>
     <hint type="destinationlabel">
      <x>36</x>
@@ -333,8 +350,8 @@
    <slot>cBvor_clicked()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>111</x>
-     <y>112</y>
+     <x>112</x>
+     <y>150</y>
     </hint>
     <hint type="destinationlabel">
      <x>166</x>
@@ -349,8 +366,8 @@
    <slot>cBndb_clicked()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>90</x>
-     <y>140</y>
+     <x>91</x>
+     <y>176</y>
     </hint>
     <hint type="destinationlabel">
      <x>137</x>
@@ -365,12 +382,28 @@
    <slot>cBrw_clicked()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>74</x>
-     <y>158</y>
+     <x>75</x>
+     <y>202</y>
     </hint>
     <hint type="destinationlabel">
      <x>8</x>
      <y>191</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cBshadows</sender>
+   <signal>clicked()</signal>
+   <receiver>MainDlg</receiver>
+   <slot>cBshadows_clicked()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>84</x>
+     <y>109</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>127</x>
+     <y>51</y>
     </hint>
    </hints>
   </connection>
@@ -386,5 +419,6 @@
   <slot>cBvor_clicked()</slot>
   <slot>cBndb_clicked()</slot>
   <slot>cBrw_clicked()</slot>
+  <slot>cBshadows_clicked()</slot>
  </slots>
 </ui>

@@ -1,7 +1,7 @@
 =begin
 ** Form generated from reading ui file 'main-dlg.ui'
 **
-** Created: Mo. Jun 21 22:46:54 2010
+** Created: Di. Jun 22 12:47:06 2010
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!
@@ -13,6 +13,8 @@ class Ui_MainDlg
     attr_reader :pBrecordTrack
     attr_reader :cBautocenter
     attr_reader :cBtoorigin
+    attr_reader :cBshadows
+    attr_reader :line_3
     attr_reader :cBvor
     attr_reader :cBndb
     attr_reader :cBrw
@@ -55,6 +57,19 @@ class Ui_MainDlg
     @cBtoorigin.objectName = "cBtoorigin"
 
     @verticalLayout.addWidget(@cBtoorigin)
+
+    @cBshadows = Qt::CheckBox.new(mainDlg)
+    @cBshadows.objectName = "cBshadows"
+    @cBshadows.checked = true
+
+    @verticalLayout.addWidget(@cBshadows)
+
+    @line_3 = Qt::Frame.new(mainDlg)
+    @line_3.objectName = "line_3"
+    @line_3.setFrameShape(Qt::Frame::HLine)
+    @line_3.setFrameShadow(Qt::Frame::Sunken)
+
+    @verticalLayout.addWidget(@line_3)
 
     @cBvor = Qt::CheckBox.new(mainDlg)
     @cBvor.objectName = "cBvor"
@@ -186,6 +201,7 @@ class Ui_MainDlg
     Qt::Object.connect(@cBvor, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBvor_clicked()'))
     Qt::Object.connect(@cBndb, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBndb_clicked()'))
     Qt::Object.connect(@cBrw, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBrw_clicked()'))
+    Qt::Object.connect(@cBshadows, SIGNAL('clicked()'), mainDlg, SLOT('cBshadows_clicked()'))
 
     Qt::MetaObject.connectSlotsByName(mainDlg)
     end # setupUi
@@ -199,6 +215,7 @@ class Ui_MainDlg
     @pBrecordTrack.text = Qt::Application.translate("MainDlg", "Record Track 1", nil, Qt::Application::UnicodeUTF8)
     @cBautocenter.text = Qt::Application.translate("MainDlg", "Autocenter", nil, Qt::Application::UnicodeUTF8)
     @cBtoorigin.text = Qt::Application.translate("MainDlg", "Point to Origin", nil, Qt::Application::UnicodeUTF8)
+    @cBshadows.text = Qt::Application.translate("MainDlg", "Hill Shadows", nil, Qt::Application::UnicodeUTF8)
     @cBvor.text = Qt::Application.translate("MainDlg", "Display VOR", nil, Qt::Application::UnicodeUTF8)
     @cBndb.text = Qt::Application.translate("MainDlg", "Display NDB", nil, Qt::Application::UnicodeUTF8)
     @cBrw.text = Qt::Application.translate("MainDlg", "Display Rws", nil, Qt::Application::UnicodeUTF8)
