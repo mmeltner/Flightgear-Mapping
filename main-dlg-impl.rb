@@ -804,7 +804,6 @@ class MainDlg < Qt::Widget
 		@tilesToAddMutex.synchronize {
 			@tilesToAdd.each do |tile|
 				parent = (tile[3] == OPENSTREETMAP_TILE) ? @openstreetmapLayer : @elevationLayer
-				ap parent
 				pmi = Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(tile[0]), parent)
 				pmi.setOffset(tile[1], tile[2])
 			end
