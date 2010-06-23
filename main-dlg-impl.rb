@@ -995,10 +995,9 @@ class MainDlg < Qt::Widget
 		movemap(@node, true)
 	end
 	
-	def resize(*k)
-	ap k
+	def resizeEvent(e)
 		super
-		@hud.setPos(@w.gVmap.mapToScene(0,0)) if !@hud.nil?
+		movemap(@node, true)
 	end
 	
 	def keyPressEvent(keyevent)
@@ -1342,6 +1341,5 @@ class Qt::GraphicsSvgItem
 			}
 		end
 	end
-
 end
 
