@@ -1,19 +1,22 @@
 =begin
 ** Form generated from reading ui file 'main-dlg.ui'
 **
-** Created: Di. Jun 22 12:47:06 2010
+** Created: Mi. Jun 23 11:12:02 2010
 **      by: Qt User Interface Compiler version 4.6.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling ui file!
 =end
 
 class Ui_MainDlg
-    attr_reader :horizontalLayout_3
+    attr_reader :horizontalLayout_4
     attr_reader :verticalLayout
     attr_reader :pBrecordTrack
     attr_reader :cBautocenter
     attr_reader :cBtoorigin
     attr_reader :cBshadows
+    attr_reader :horizontalLayout_3
+    attr_reader :label_3
+    attr_reader :hSopacity
     attr_reader :line_3
     attr_reader :cBvor
     attr_reader :cBndb
@@ -38,8 +41,8 @@ class Ui_MainDlg
         mainDlg.objectName = "mainDlg"
     end
     mainDlg.resize(681, 473)
-    @horizontalLayout_3 = Qt::HBoxLayout.new(mainDlg)
-    @horizontalLayout_3.objectName = "horizontalLayout_3"
+    @horizontalLayout_4 = Qt::HBoxLayout.new(mainDlg)
+    @horizontalLayout_4.objectName = "horizontalLayout_4"
     @verticalLayout = Qt::VBoxLayout.new()
     @verticalLayout.objectName = "verticalLayout"
     @pBrecordTrack = Qt::PushButton.new(mainDlg)
@@ -63,6 +66,26 @@ class Ui_MainDlg
     @cBshadows.checked = true
 
     @verticalLayout.addWidget(@cBshadows)
+
+    @horizontalLayout_3 = Qt::HBoxLayout.new()
+    @horizontalLayout_3.objectName = "horizontalLayout_3"
+    @label_3 = Qt::Label.new(mainDlg)
+    @label_3.objectName = "label_3"
+
+    @horizontalLayout_3.addWidget(@label_3)
+
+    @hSopacity = Qt::Slider.new(mainDlg)
+    @hSopacity.objectName = "hSopacity"
+    @hSopacity.maximumSize = Qt::Size.new(50, 16777215)
+    @hSopacity.minimum = 1
+    @hSopacity.maximum = 100
+    @hSopacity.sliderPosition = 100
+    @hSopacity.orientation = Qt::Horizontal
+
+    @horizontalLayout_3.addWidget(@hSopacity)
+
+
+    @verticalLayout.addLayout(@horizontalLayout_3)
 
     @line_3 = Qt::Frame.new(mainDlg)
     @line_3.objectName = "line_3"
@@ -170,7 +193,7 @@ class Ui_MainDlg
     @verticalLayout.addWidget(@pBexit)
 
 
-    @horizontalLayout_3.addLayout(@verticalLayout)
+    @horizontalLayout_4.addLayout(@verticalLayout)
 
     @gVmap = Qt::GraphicsView.new(mainDlg)
     @gVmap.objectName = "gVmap"
@@ -189,7 +212,7 @@ class Ui_MainDlg
     @gVmap.foregroundBrush = brush1
     @gVmap.viewportUpdateMode = Qt::GraphicsView::FullViewportUpdate
 
-    @horizontalLayout_3.addWidget(@gVmap)
+    @horizontalLayout_4.addWidget(@gVmap)
 
 
     retranslateUi(mainDlg)
@@ -202,6 +225,7 @@ class Ui_MainDlg
     Qt::Object.connect(@cBndb, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBndb_clicked()'))
     Qt::Object.connect(@cBrw, SIGNAL('clicked(bool)'), mainDlg, SLOT('cBrw_clicked()'))
     Qt::Object.connect(@cBshadows, SIGNAL('clicked()'), mainDlg, SLOT('cBshadows_clicked()'))
+    Qt::Object.connect(@hSopacity, SIGNAL('valueChanged(int)'), mainDlg, SLOT('hSopacity_changed(int)'))
 
     Qt::MetaObject.connectSlotsByName(mainDlg)
     end # setupUi
@@ -216,6 +240,7 @@ class Ui_MainDlg
     @cBautocenter.text = Qt::Application.translate("MainDlg", "Autocenter", nil, Qt::Application::UnicodeUTF8)
     @cBtoorigin.text = Qt::Application.translate("MainDlg", "Point to Origin", nil, Qt::Application::UnicodeUTF8)
     @cBshadows.text = Qt::Application.translate("MainDlg", "Hill Shadows", nil, Qt::Application::UnicodeUTF8)
+    @label_3.text = Qt::Application.translate("MainDlg", "Opacity", nil, Qt::Application::UnicodeUTF8)
     @cBvor.text = Qt::Application.translate("MainDlg", "Display VOR", nil, Qt::Application::UnicodeUTF8)
     @cBndb.text = Qt::Application.translate("MainDlg", "Display NDB", nil, Qt::Application::UnicodeUTF8)
     @cBrw.text = Qt::Application.translate("MainDlg", "Display Rws", nil, Qt::Application::UnicodeUTF8)

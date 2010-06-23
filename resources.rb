@@ -1,7 +1,7 @@
 #****************************************************************************
 #** Ruby Resource object code
 #**
-#** Created: Di. Jun 22 12:47:06 2010
+#** Created: Mi. Jun 23 11:12:02 2010
 #**      by: The Ruby Resource Compiler for Qt version 4.6.2
 #**
 #** WARNING! All changes made in this file will be lost!

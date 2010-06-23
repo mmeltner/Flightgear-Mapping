@@ -52,6 +52,9 @@ Z_VALUE_HUD = 10
 Z_VALUE_WARNING = 20
 SCALE_SVG = 0.3
 
+OPENSTREETMAP_TILE = 0
+ELEVATION_TILE = 1
+
 COLORRANGE_DEG = 120.0
 COLOROFFSET_DEG = 240.0
 
@@ -73,9 +76,9 @@ LONSTARTUP = 8.55965957641601
 
 MAPSDIR = ENV['HOME'] + "/.OpenstreetmapTiles"
 
-Thread.abort_on_exception = true
-GC.disable
-ap "gcdisabl"
+#Thread.abort_on_exception = true
+#GC.disable
+
 # Class MainDlg ############################################
 class MainDlg < Qt::Widget
 	attr_reader :node, :scene_tiles, :scene, :toffset_x, :offset_y, :menu, :waypoints, \
@@ -85,8 +88,8 @@ class MainDlg < Qt::Widget
 	
 	slots "pBexit_clicked()", "pBdo_clicked()", "pBplus_clicked()", "pBminus_clicked()", \
 		"cBpointorigin_clicked()", "pBrecordTrack_toggled(bool)", "wakeupTimer()", "autosaveTimer()", \
-		'cBvor_clicked()', 'cBndb_clicked()', 'cBrw_clicked()', 'cBshadows_clicked()'
-@@pixmap=Array.new
+		'cBvor_clicked()', 'cBndb_clicked()', 'cBrw_clicked()', 'cBshadows_clicked()', 'hSopacity_changed(int)'
+
 	def initialize(parent, arg)
 		super(parent)
 		@w=Ui::MainDlg.new
@@ -101,6 +104,7 @@ class MainDlg < Qt::Widget
 		@w.cBrw.setChecked(@cfg.value("rwChecked",Qt::Variant.new(false)).toBool)
 		@w.cBndb.setChecked(@cfg.value("nbdChecked",Qt::Variant.new(false)).toBool)
 		@w.cBvor.setChecked(@cfg.value("vorChecked",Qt::Variant.new(true)).toBool)
+		@opacity = @cfg.value("opacity",Qt::Variant.new(1.0)).toFloat
 
 		@flag=Qt::Pixmap.new(":/icons/flag-blue.png")
 		@pin=Qt::Pixmap.new(":/icons/wpttemp-red.png")
@@ -147,9 +151,11 @@ class MainDlg < Qt::Widget
 		@httpElevationMutex = Mutex.new
 		@queryMutex = Mutex.new
 		@tilesToAddMutex = Mutex.new
-			
+		
 		@scene=Qt::GraphicsScene.new()
 		@w.gVmap.setScene(@scene)
+		resetScene()
+		
 		@w.lBzoom.setText(@zoom.to_s)
 		vorGraphic=Qt::GraphicsSvgItem.new(":/icons/vor.svg")
 		vorGraphic.setElementId("VOR")
@@ -178,6 +184,19 @@ class MainDlg < Qt::Widget
 		puts "Map Directory located here: \"#{$MAPSHOME}\""
 		
 		readFlightgear()
+	end
+
+	def resetScene
+		@scene.clear
+		@openstreetmapLayer = TileGraphicsItemGroup.new
+		@openstreetmapLayer.setZValue(Z_VALUE_TILES)
+		@openstreetmapLayer.setOpacity(@opacity)
+		@scene.addItem(@openstreetmapLayer)
+		@elevationLayer = Qt::GraphicsItemGroup.new
+		@elevationLayer.setZValue(Z_VALUE_TILES_ELEVATION)
+		@scene.addItem(@elevationLayer)
+		
+		@w.hSopacity.setValue((@opacity * 100).to_i)
 	end
 
 	def get_data(path)
@@ -408,13 +427,11 @@ class MainDlg < Qt::Widget
 			# we can not add the tiles to the scene within this thread directly. It crosses thread
 			# bounderies which crashes QT badly
 			@tilesToAddMutex.synchronize {
-				@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES]
+				@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, OPENSTREETMAP_TILE]
 			}
 		else # add immediately, we are not in a different thread
-			pmi=TileGraphicsPixmapItem.new(Qt::Pixmap.new(f))
+			pmi=Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f), @openstreetmapLayer)
 			pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
-			pmi.setZValue(Z_VALUE_TILES)
-			@scene.addItem(pmi)
 		end
 
 		if @w.cBshadows.isChecked then
@@ -423,13 +440,12 @@ class MainDlg < Qt::Widget
 					# we can not add the tiles to the scene within this thread directly. It crosses thread
 					# bounderies which crashes QT badly
 					@tilesToAddMutex.synchronize {
-						@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES_ELEVATION]
+						@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, ELEVATION_TILE]
 					}
 				else
-					pmi = Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f + "-elevation.png"))
+					pmi = Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f + "-elevation.png"), @elevationLayer)
 					pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
 					pmi.setZValue(Z_VALUE_TILES_ELEVATION)
-					@scene.addItem(pmi)
 				end
 			else
 				@httpThreads << Thread.new(f) {|filename|
@@ -450,7 +466,7 @@ class MainDlg < Qt::Widget
 											file.write(data)
 										end
 										@tilesToAddMutex.synchronize {
-											@tilesToAdd << [$MAPSHOME + fn + "-elevation.png", (x - origin_x)*256, (y - origin_y)*256, Z_VALUE_TILES_ELEVATION]
+											@tilesToAdd << [$MAPSHOME + fn + "-elevation.png", (x - origin_x)*256, (y - origin_y)*256, ELEVATION_TILE]
 										}
 									end
 								else
@@ -531,7 +547,7 @@ class MainDlg < Qt::Widget
 			@scene_tiles = []
 			@scene_navs = []
 			@scene_rws = []
-			@scene.clear
+			resetScene()
 			# 8 => 256 = 2**8
 			size = 2**(@zoom + 8)
 			sceneRect = Qt::RectF.new(0,0,size,size)
@@ -555,7 +571,7 @@ class MainDlg < Qt::Widget
 			@scene_tiles = []
 			@scene_navs = []
 			@scene_rws = []
-			@scene.clear
+			resetScene()
 		end
 
 		if @w.cBrw.isChecked then
@@ -573,7 +589,7 @@ class MainDlg < Qt::Widget
 			@scene_tiles = []
 			@scene_navs = []
 			@scene_rws = []
-			@scene.clear
+			resetScene()
 		end
 
 		fn = node.getfilenames(@w.gVmap.size, @offset_x, @offset_y)
@@ -787,10 +803,10 @@ class MainDlg < Qt::Widget
 		# add tiles which are awaiting addition				
 		@tilesToAddMutex.synchronize {
 			@tilesToAdd.each do |tile|
-				pmi = TileGraphicsPixmapItem.new(Qt::Pixmap.new(tile[0]))
+				parent = (tile[3] == OPENSTREETMAP_TILE) ? @openstreetmapLayer : @elevationLayer
+				ap parent
+				pmi = Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(tile[0]), parent)
 				pmi.setOffset(tile[1], tile[2])
-				pmi.setZValue(tile[3])
-				@scene.addItem(pmi)
 			end
 			@tilesToAdd.clear
 		}
@@ -958,6 +974,7 @@ class MainDlg < Qt::Widget
 		@cfg.setValue("rwChecked", Qt::Variant.new(@w.cBrw.isChecked))
 		@cfg.setValue("nbdChecked", Qt::Variant.new(@w.cBndb.isChecked))
 		@cfg.setValue("vorChecked", Qt::Variant.new(@w.cBvor.isChecked))
+		@cfg.setValue("opacity", Qt::Variant.new(@opacity))
 		@cfg.sync
 		@parent.close
 	end
@@ -979,6 +996,7 @@ class MainDlg < Qt::Widget
 	end
 	
 	def resize(*k)
+	ap k
 		super
 		@hud.setPos(@w.gVmap.mapToScene(0,0)) if !@hud.nil?
 	end
@@ -995,7 +1013,13 @@ class MainDlg < Qt::Widget
 				super
 		end # case
 	end
+
+	def hSopacity_changed(opacity)
+		@opacity = opacity / 100.0
+		@openstreetmapLayer.setOpacity(@opacity)
+	end
 end
+
 
 
 class FlagGraphicsPixmapItem < Qt::GraphicsPixmapItem
@@ -1178,7 +1202,7 @@ class TrackGraphicsPathItem < Qt::GraphicsPathItem
 end
 
 
-class TileGraphicsPixmapItem < Qt::GraphicsPixmapItem
+class TileGraphicsItemGroup < Qt::GraphicsItemGroup
 	def mousePressEvent(mouseEvent)
 		pos = mouseEvent.scenePos
 		dlg=mouseEvent.widget.parent.parent
@@ -1321,12 +1345,3 @@ class Qt::GraphicsSvgItem
 
 end
 
-
-#class Qt::GraphicsScene
-#	def addItem(*k)
-#	#	ap "additem"
-#		ap k[0]
-#	#	ap items.length
-#		super
-#	end
-#end
