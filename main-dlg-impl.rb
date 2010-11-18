@@ -204,8 +204,8 @@ class MainDlg < Qt::Widget
 		r=@fs_ans.reverse.detect do |f|
 			f.include?(path)
 		end
-		r =~ /-?\d+\.\d+/
-		return $&.to_f
+		r =~ /'(-?\d+\.\d+)' \(double\)/
+		return $1.to_f
 	end
 
 	def putflag(x,y,i,node)
@@ -759,10 +759,10 @@ class MainDlg < Qt::Widget
 							@fs_queries.each do |q|
 								@fs_socket.print("get " + q + "\r\n")
 								s=""
-								while select([@fs_socket], nil, nil, 0.3) do
+								while select([@fs_socket], nil, nil, 0.8) do
 									s += @fs_socket.read(1)
 									# check for end of line characterized by this string: "\r\n/>"
-									# break	if s[-4..-1] == "\r\n/>" and s.include?(q)
+									break	if s[-4..-1] == "\r\n/>" and s.include?(q)
 								end
 								if s.include?(q) then
 									@fs_ans << s.split("\n")
