@@ -1,4 +1,4 @@
-require "nodeinfo-widget"
+require "./nodeinfo-widget"
 begin
 	require "ap"
 rescue LoadError

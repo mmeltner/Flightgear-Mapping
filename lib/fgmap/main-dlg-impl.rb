@@ -1,3 +1,4 @@
+# coding: utf-8
 ##################################################
 # Flightgear Mapping
 #
@@ -11,20 +12,28 @@
 # Author Michael Meltner (mmeltner@gmail.com)
 ##################################################
 
+
 require 'net/http'
-require "main-dlg"
-require "tile"
-require "resources"
 require 'socket'
-require "hud-impl"
-require "nodeinfo-impl"
-require 'navaid.rb'
-require "xml"
+require 'rexml/document'
+require './main-dlg'
+require './tile'
+require './resources'
+require './hud-impl'
+require './nodeinfo-impl'
+require './navaid.rb'
+require './context_menu.rb'
 begin
-	require "ap"
+	require 'ap'
 rescue LoadError
 	def ap(*k)
 		p k
+	end
+end
+
+if RUBY_VERSION =~ /^1\.8/ then
+	class Net::HTTP
+		alias request_get get
 	end
 end
 
@@ -79,6 +88,14 @@ MAPSDIR = ENV['HOME'] + "/.OpenstreetmapTiles"
 #Thread.abort_on_exception = true
 #GC.disable
 
+class REXML::Element
+	def add_text_element(nodename, text)
+		e = REXML::Element.new(nodename)
+		e.add_text(text)
+		self.add_element(e)
+	end
+end
+		
 # Class MainDlg ############################################
 class MainDlg < Qt::Widget
 	attr_reader :node, :scene_tiles, :scene, :toffset_x, :offset_y, :menu, :waypoints, \
@@ -99,12 +116,12 @@ class MainDlg < Qt::Widget
 		@cfg=Qt::Settings.new("MMeltnerSoft", "fg_map")
 		@metricUnit = @cfg.value("metricUnit",Qt::Variant.new(true)).toBool
 		@zoom = @cfg.value("zoom",Qt::Variant.new(13)).toInt
-		@lat = @cfg.value("lat",Qt::Variant.new(LATSTARTUP)).toDouble
-		@lon = @cfg.value("lon",Qt::Variant.new(LONSTARTUP)).toDouble
+		@lat = @cfg.value("lat",Qt::Variant.new(LATSTARTUP.to_s)).toDouble
+		@lon = @cfg.value("lon",Qt::Variant.new(LONSTARTUP.to_s)).toDouble
 		@w.cBrw.setChecked(@cfg.value("rwChecked",Qt::Variant.new(false)).toBool)
 		@w.cBndb.setChecked(@cfg.value("nbdChecked",Qt::Variant.new(false)).toBool)
 		@w.cBvor.setChecked(@cfg.value("vorChecked",Qt::Variant.new(true)).toBool)
-		@opacity = @cfg.value("opacity",Qt::Variant.new(1.0)).toFloat
+		@opacity = @cfg.value("opacity",Qt::Variant.new((1.0).to_s)).toFloat
 
 		@flag=Qt::Pixmap.new(":/icons/flag-blue.png")
 		@pin=Qt::Pixmap.new(":/icons/wpttemp-red.png")
@@ -244,31 +261,36 @@ class MainDlg < Qt::Widget
 			end
 		
 			ap "generating xml-doc"
-			doc = XML::Document.new()
-			doc.root = XML::Node.new('gpx')
-			doc.root["xmlns"] = "http://www.topografix.com/GPX/1/1"
-			doc.root["creator"] = "ruby-tracker"
-			doc.root["version"] = "1.1"
-			doc.root["xmlns:xsi"] = "http://www.w3.org/2001/XMLSchema-instance" 
-			doc.root["xsi:schemaLocation"] = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+			doc = REXML::Document.new 
+			doc << REXML::XMLDecl.new(REXML::XMLDecl::DEFAULT_VERSION, REXML::XMLDecl::DEFAULT_ENCODING)
 
-			tracknode = XML::Node.new("trk")
-			doc.root << tracknode
+			doc.add_element('gpx')
+
+			node=REXML::XPath.first(doc, "//gpx")
+			node.add_namespace("http://www.topografix.com/GPX/1/1")
+			node.add_attributes({'creator'=>"ruby-tracker", "version"=>"1.1"} )
+			node.add_namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance")
+
+			tracknode = REXML::Element.new("trk")
+			node.add_element(tracknode)
 			items.each{|track|
-				segnode = XML::Node.new("trkseg")
-				tracknode << segnode
+				segnode = REXML::Element.new("trkseg")
+				tracknode.add_element(segnode)
 				track.nodes.each{|n|
-					trackpoint = XML::Node.new("trkpt")
-					trackpoint["lat"] = 	n.lat.to_s.gsub(",",".")
-					trackpoint["lon"] = 	n.lon.to_s.gsub(",",".")
-					trackpoint << XML::Node.new("ele", n.elevation.to_s.gsub(",","."))
-					trackpoint << XML::Node.new("time", n.toGPStime)
-					trackpoint << XML::Node.new("time_us", n.timestamp.usec.to_s)
-					segnode << trackpoint
+					trackpoint = REXML::Element.new("trkpt")
+					trackpoint.add_attributes({"lat" =>	n.lat.to_s.gsub(",","."), "lon" => n.lon.to_s.gsub(",",".")})
+					trackpoint.add_text_element("ele", n.elevation.to_s.gsub(",","."))
+					trackpoint.add_text_element("time", n.toGPStime)
+					trackpoint.add_text_element("time_us", n.timestamp.usec.to_s)
+					segnode.add_element(trackpoint)
 				}
 			}
 			File.open($MAPSHOME + "/tracks/" + items.first.nodes.first.toGPStime + ".gpx", "w+"){|f|
-				f.puts doc.inspect
+				begin
+					doc.write(f, 2)
+				rescue Errno::EISDIR
+					Qt::MessageBox::warning(nil, "Warning", "You selected a directory, not a file. Nothing saved.")
+				end
 			}
 			ap "xml-file written"
 		end
@@ -278,31 +300,35 @@ class MainDlg < Qt::Widget
 		fn=Qt::FileDialog::getOpenFileName(nil, title, $MAPSHOME + "/tracks/", "Track-Data (*.gpx *.log);;All (*)")
 		if !fn.nil? then
 			success = false
-			doc = XML::Document.file(fn)
-			doc.find('/ns:gpx/ns:trk', "ns:http://www.topografix.com/GPX/1/1").each{|trk|
-				@mytrack_current -= 1
-				trk.find("ns:trkseg", "ns:http://www.topografix.com/GPX/1/1").each{|seg|
-					ns = XML::Namespace.new(seg, 'ns', 'http://www.topografix.com/GPX/1/1')
-					seg.namespaces.namespace=ns
-					@mytrack_current += 1
-					if @mytracks[@mytrack_current].nil? then
-						@mytracks[@mytrack_current] = Way.new(1, 'user', Time.now, nextcolor)
-						@prev_track_node = nil
+			file=File.new(fn)
+			begin
+				doc = REXML::Document.new(file)
+
+				doc.elements.each("/gpx/trk") do |trk|
+					@mytrack_current -= 1
+					trk.elements.each("trkseg") do |seg|
+						@mytrack_current += 1
+						if @mytracks[@mytrack_current].nil? then
+							@mytracks[@mytrack_current] = Way.new(1, 'user', Time.now, nextcolor)
+							@prev_track_node = nil
+						end
+						track=@mytracks[@mytrack_current]
+						track.nodes.clear
+						seg.elements.each("trkpt") do |tpt|
+							usec = tpt.elements["time_us"].text.strip
+							usec = (usec.nil? ? "0" : usec)
+							loc = tpt.attributes # lon and lat as a hash
+							track << Node.new(nil, tpt.elements["time"].text.strip + usec, \
+									loc["lon"].to_f, loc["lat"].to_f, \
+									tpt.elements["ele"].text.to_f)
+							success = true
+						end
 					end
-					track=@mytracks[@mytrack_current]
-					track.nodes.clear
-					xpat_time = XML::XPath::Expression.new("ns:time")
-					xpat_time_us = XML::XPath::Expression.new("ns:time_us")
-					xpat_elevation = XML::XPath::Expression.new("ns:ele")
-					seg.find("ns:trkpt", "ns:http://www.topografix.com/GPX/1/1").each{|tpt|
-						usec = tpt.find_first(xpat_time_us)
-						usec = (usec.nil? ? "0" : usec.content)
-						track << Node.new(nil, tpt.find_first(xpat_time).content + usec, \
-								tpt["lon"].to_f, tpt["lat"].to_f, tpt.find_first(xpat_elevation).content.to_f)
-						success = true
-					}
-				}
-			}
+				end
+			rescue Errno::EISDIR
+				# swallow error, "success" is false anyway
+			end
+
 			if success then
 				movemap(@node, true)
 			else
@@ -316,23 +342,28 @@ class MainDlg < Qt::Widget
 		fn=Qt::FileDialog::getOpenFileName(nil, title, $MAPSHOME + "/waypoints/", "Waypoint-Data (*.gpx *.log);;All (*)")
 		if !fn.nil? then
 			success = false
-			doc = XML::Document.file(fn)
-			@waypoints = Way.new(nil,'user', Time.now, "Blue")
-			doc.find("/ns:gpx/ns:wpt", "ns:http://www.topografix.com/GPX/1/1").each{ |wpt|
-				ns = XML::Namespace.new(wpt, 'ns', 'http://www.topografix.com/GPX/1/1')
-				wpt.namespaces.namespace = ns
-				xpat_time = XML::XPath::Expression.new("ns:time")
-				xpat_elevation = XML::XPath::Expression.new("ns:ele")
-				@waypoints << Node.new(nil, wpt.find_first(xpat_time).content, wpt["lon"].to_f, \
-							wpt["lat"].to_f, wpt.find_first(xpat_elevation).content.to_f)
-				success = true
-			}
-			if success then
-				movemap(@node, true)
-			else
-				Qt::MessageBox::warning(nil, "Warning", "No data found in file.")
+			file=File.new(fn)
+			begin
+				doc = REXML::Document.new(file)
+				@waypoints = Way.new(nil,'user', Time.now, "Blue")
+				doc.elements.each("/gpx/wpt") do |wpt|
+					loc = wpt.attributes # lon and lat as a hash
+					@waypoints << Node.new(nil, wpt.elements["time"].text.strip,
+								loc["lon"].to_f, loc["lat"].to_f, \
+								wpt.elements["ele"].text.to_f)
+					success = true
+				end
+				file.close
+				if success then
+					movemap(@node, true)
+				else
+					Qt::MessageBox::warning(nil, "Warning", "No data found in file.")
+				end
+				return success
+			rescue Errno::EISDIR
+				Qt::MessageBox::warning(nil, "Warning", "You selected a directory, not a file. Nothing loaded.")
+				return success
 			end
-			return success
 		end
 	end
 
@@ -346,32 +377,36 @@ class MainDlg < Qt::Widget
 				# just swallow error
 			end
 		
-			doc = XML::Document.new()
-			doc.root = XML::Node.new('gpx')
-			doc.root["xmlns"] = "http://www.topografix.com/GPX/1/1"
-			doc.root["creator"] = "ruby-tracker"
-			doc.root["version"] = "1.1"
-			doc.root["xmlns:xsi"] = "http://www.w3.org/2001/XMLSchema-instance" 
-			doc.root["xsi:schemaLocation"] = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+			doc = REXML::Document.new 
+			doc << REXML::XMLDecl.new(REXML::XMLDecl::DEFAULT_VERSION, REXML::XMLDecl::DEFAULT_ENCODING)
+
+			doc.add_element('gpx')
+			root=REXML::XPath.first(doc, "//gpx")
+			root.add_namespace("http://www.topografix.com/GPX/1/1")
+			root.add_attributes({'creator'=>"ruby-tracker", "version"=>"1.1"} )
+			root.add_namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance")
 
 			waypoints[0].nodes.each{|n|
 				if !n.nil? then
-					wpnode = XML::Node.new("wpt")
-					doc.root << wpnode
-					wpnode["lat"] = 	n.lat.to_s.gsub(",",".")
-					wpnode["lon"] = 	n.lon.to_s.gsub(",",".")
-					wpnode << XML::Node.new("ele", n.elevation.to_s.gsub(",","."))
-					wpnode << XML::Node.new("time", n.toGPStime)
+					wpnode = REXML::Element.new("wpt")
+					root.add_element(wpnode)
+					wpnode.add_attributes({"lat" =>	n.lat.to_s.gsub(",","."), "lon" => n.lon.to_s.gsub(",",".")})
+					wpnode.add_text_element("ele", n.elevation.to_s.gsub(",","."))
+					wpnode.add_text_element("time", n.toGPStime)
 				end
 			}
-			fn=Qt::FileDialog::getSaveFileName(nil, "Save Waypoint File", $MAPSHOME + "/waypoints/", "Waypoint-Data (*.gpx *.log);;All (*)","*.gpx")
 
+			fn=Qt::FileDialog::getSaveFileName(nil, "Save Waypoint File", $MAPSHOME + "/waypoints/", "Waypoint-Data (*.gpx *.log);;All (*)","*.gpx")
 			if !fn.nil? then
 				if fn !~ /\.gpx$/ then
 					fn += ".gpx"
 				end
 				File.open(fn, "w+"){|f|
-					f.puts doc.inspect
+					begin
+						doc.write(f, 2)
+					rescue Errno::EISDIR
+						Qt::MessageBox::warning(nil, "Warning", "You selected a directory, not a file. Nothing saved.")
+					end
 				}
 			end
 		end
@@ -427,10 +462,10 @@ class MainDlg < Qt::Widget
 			# we can not add the tiles to the scene within this thread directly. It crosses thread
 			# bounderies which crashes QT badly
 			@tilesToAddMutex.synchronize {
-				@tilesToAdd << [f, (x - origin_x)*256, (y - origin_y)*256, OPENSTREETMAP_TILE]
+				@tilesToAdd << [f+".png", (x - origin_x)*256, (y - origin_y)*256, OPENSTREETMAP_TILE]
 			}
 		else # add immediately, we are not in a different thread
-			pmi=Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f), @openstreetmapLayer)
+			pmi=Qt::GraphicsPixmapItem.new(Qt::Pixmap.new(f+".png"), @openstreetmapLayer)
 			pmi.setOffset((x - origin_x)*256, (y - origin_y)*256)
 		end
 
@@ -458,12 +493,12 @@ class MainDlg < Qt::Widget
 							filename =~ /\/\d+\/\d+\/\d+$/
 							fn = $&
 							begin
-								resp, data = h.get("/~cmarqu/hill" + fn + ".png", nil)
+								resp, data = h.request_get("/~cmarqu/hill" + fn + ".png", nil)
 								if resp.kind_of?(Net::HTTPOK) then
 									# check here again as in the meantime another thread might already have added the tile
 									if !FileTest.exist?($MAPSHOME + fn + "-elevation.png") then
 										File.open($MAPSHOME + fn + "-elevation.png", "w") do |file|
-											file.write(data)
+											file.syswrite(data)
 										end
 										@tilesToAddMutex.synchronize {
 											@tilesToAdd << [$MAPSHOME + fn + "-elevation.png", (x - origin_x)*256, (y - origin_y)*256, ELEVATION_TILE]
@@ -610,7 +645,7 @@ class MainDlg < Qt::Widget
 								filename =~ /\/\d+\/\d+\/\d+$/
 								fn = $&
 								begin
-									resp, data = h.get(fn + ".png", nil)
+									resp, data = h.request_get(fn + ".png", nil)
 									if resp.kind_of?(Net::HTTPOK) then
 										maindir = Dir.pwd
 										Dir.chdir($MAPSHOME)
@@ -626,7 +661,7 @@ class MainDlg < Qt::Widget
 										end
 										Dir.chdir(maindir)
 										File.open($MAPSHOME + fn + ".png", "w") do |file|
-											file.write(data)
+											file.syswrite(data)
 										end
 										# we call from within a thread, signal this to the subroutine
 										addTileToScene($MAPSHOME + fn, origin_x, origin_y, true)
@@ -1212,97 +1247,6 @@ class TileGraphicsItemGroup < Qt::GraphicsItemGroup
 #			when Qt::RightButton
 			
 		end # case
-	end
-	
-	def contextMenuEvent(contextEvent)
-		dlg=contextEvent.widget.parent.parent
-		entries=["Set Waypoint", "Delete Waypoint", "Waypoints to Route-Mgr", "Set Origin", "-", "Save Waypoints", "Save Track", "Load Waypoints",
-				"Load Track", ["Metric Units", dlg.metricUnit]]
-		menu=Qt::Menu.new
-		entries.each{|e|
-			if e.kind_of? Array then
-				action = Qt::Action.new(e[0], nil)
-				action.setCheckable(true)
-				action.setChecked(e[1])
-				menu.addAction(action)
-			else
-				if e=="-" then
-					menu.addSeparator
-				else
-					action = Qt::Action.new(e, nil)
-					if e =~ /(Delete Waypoint|Waypoints to)/ then
-						action.setEnabled(false) if dlg.waypoints.nodes.empty?
-					end
-					menu.addAction(action)
-				end
-			end
-		}
-		sel=menu.exec(contextEvent.screenPos)
-		sel=sel.text if !sel.nil?
-		lon=dlg.node.tolon(dlg.node.xtile + contextEvent.scenePos.x / 256.0)
-		lat=dlg.node.tolat(dlg.node.ytile + contextEvent.scenePos.y / 256.0)
-		case sel
-			when entries[0]
-				i=dlg.waypoints << Node.new(nil, Time.now, lon, lat)
-				dlg.putflag(contextEvent.scenePos.x, contextEvent.scenePos.y, i, dlg.waypoints.nodes.last)
-				if i==1 and dlg.waypoints.nodes.length == 1 then
-					dlg.w.lBcurrentwp.text="1"
-					dlg.waypoints.currentwp=1
-				end
-				
-			when entries[1]
-				d=dlg.waypoints.del(lon,lat)
-				if dlg.w.lBcurrentwp.text.to_i == d then
-					dlg.w.lBcurrentwp.text="-"
-				end
-				dlg.movemap(dlg.node, true)
-				
-			when entries[2]
-				Thread.new {
-					dlg.waypoints.nodes.each do |n|
-						dlg.writeFlightsim("set /autopilot/route-manager/input @INSERT-1:#{n.lon.to_s.gsub(",",".")},#{n.lat.to_s.gsub(",",".")}")
-					end
-				}
-		
-
-			when entries[3]
-				dlg.node = Node.new(1, Time.now, lon, lat)
-				dlg.offset_x = 0
-				dlg.offset_y = 0
-				dlg.movemap(dlg.node, true)
-				
-			when entries[5]
-				dlg.saveWaypoints([dlg.waypoints])
-				
-			when entries[6]
-				dlg.savetrack(dlg.mytracks)
-
-			when entries[7]
-				savecurrent = dlg.waypoints.currentwp
-				if dlg.loadwaypoint("Load Waypoints") then
-					dlg.waypoints.currentwp = nil
-				else
-					dlg.waypoints.currentwp = savecurrent
-				end
-				
-			when entries[8]
-				dlg.mytrack_current += (dlg.w.pBrecordTrack.isChecked ? 0 : 1)
-				savewp=dlg.mytracks[dlg.mytrack_current]
-				if dlg.mytracks[dlg.mytrack_current].nil? then
-					dlg.mytracks[dlg.mytrack_current] = Way.new(1, 'user', Time.now, dlg.nextcolor)
-					@prev_track_node = nil
-				end
-				if dlg.loadtrack("Load Track") then
-					dlg.w.pBrecordTrack.text = "Record Track #{dlg.mytrack_current + 2}"
-					dlg.w.pBrecordTrack.setChecked(false)
-				else
-					dlg.mytracks[dlg.mytrack_current]=savewp
-				end
-
-			when entries[9][0]
-				dlg.metricUnit = !dlg.metricUnit
-								
-		end #case
 	end
 end
 

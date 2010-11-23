@@ -1,5 +1,5 @@
 require 'zlib'
-require 'bsearch'
+require './bsearch'
 begin
 	require "ap"
 rescue LoadError

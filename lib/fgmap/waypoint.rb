@@ -21,7 +21,7 @@ Dir.chdir(File.dirname(myself))
 
 require "rubygems"
 require "Qt4"
-require "main-dlg-impl.rb"
+require "./main-dlg-impl.rb"
 
 a = Qt::Application.new(ARGV)
 a.setWindowIcon(Qt::Icon.new(":/icons/vor.png"))

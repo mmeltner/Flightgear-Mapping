@@ -1,4 +1,4 @@
-require "hud-widget"
+require "./hud-widget"
 
 # Class MainDlg ############################################
 class HudWidget < Qt::Widget
