@@ -14,7 +14,7 @@ exclude_me = ['*.ui', '*.png', '*.svg', '*.qrc', 'Makefile', 'compress-resource.
 require 'jeweler'
 Jeweler::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
-  gem.name = "fgmap"
+  gem.name = "fgmapping"
   gem.homepage = "http://rubyforge.org/frs/?group_id=9572"
   gem.license = "GPL2"
   gem.summary = %Q{Real-time mapping for Flightgear}
