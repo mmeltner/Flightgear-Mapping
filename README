@@ -1,39 +1,33 @@
-How to run fgmap
-================
+How to run fgmapping
+====================
 
 Requirements:
-- ruby of course. Min version 1.8.6
-- qtruby4, minimum version 4.4
+- ruby of course. Min version 1.8.6 up to 1.9.2
+- either:qtruby4, minimum version 4.4
 	see: http://rubyforge.org/projects/korundum
 	debian/ubuntu: sudo apt-get install libqt4-ruby
-- xml bindings libxml
-	see: http://libxml.rubyforge.org
-	debian/ubuntu: sudo apt-get install libxml-ruby
+  or: qtbindings, min version 4.6.3.1
+	sudo gem install qtbindings
 
 
 Run:
-You basically have 3 options:
+You basically have 2 options:
 
 1) (you already have ruby and qtruby installed)
 - unpack the 'fgmap.tar.gz' into any directory
 - cd into this directory
-- on shell type: ruby init.rb
+- on shell type: ruby waypoint.rb
 
 2) (you already have ruby and rubygems installed)
 - type: sudo gem install fgmapping
-- make sure /var/lib/gems/1.8/bin is in your standard path ($PATH)
-- execute 'flightgear-mapping'
-
-3) (you don't have ruby installed, don't even know what this is)
-- download "fgmap_linux"
-- change permission to 'executable': chmod 774 fgmap_linux
-- to run it, just type ./fgmap_linux
+- make sure /var/lib/gems/1.*/bin is in your standard path ($PATH)
+- execute 'fgmapping'
 
 In any case you need to launch Flightgear like this:
 - run Flightgear with additional command line option: --telnet=2948
 
 
-Develop:
+Development:
 Download git repository:
 - git clone git://rubyforge.org/fgmap.git
 Remarks for development:     
