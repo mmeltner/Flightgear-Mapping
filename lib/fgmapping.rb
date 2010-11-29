@@ -19,5 +19,5 @@ if File.lstat(myself).symlink? then
 end
 Dir.chdir(File.dirname(myself))
 
-load "./fgmap/waypoint.rb"
+load "./fgmapping/waypoint.rb"
 
