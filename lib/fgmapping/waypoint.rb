@@ -23,6 +23,14 @@ require "rubygems"
 require "Qt4"
 require "./main-dlg-impl.rb"
 
+enc = __ENCODING__.names[0]
+p enc
+
+# important settings so that ruby and QT4 are in sync regarding its locale
+Qt::TextCodec.setCodecForTr(Qt::TextCodec.codecForName(enc)); 
+Qt::TextCodec.setCodecForLocale(Qt::TextCodec.codecForName(enc)); 
+Qt::TextCodec.setCodecForCStrings(Qt::TextCodec.codecForName(enc)); 
+
 a = Qt::Application.new(ARGV)
 a.setWindowIcon(Qt::Icon.new(":/icons/vor.png"))
 u = Qt::MainWindow.new
